@@ -20,82 +20,60 @@ TOKEN = os.getenv("TELEGRAM_TOKEN", "8443480253:AAGADNDFa1w6EVUzq9dnZ-YoBL_LUz6u
 CHAT_ID = os.getenv("CHAT_ID", "6332442153")
 
 WATCHLIST = ['NVDA', 'ARM', 'SEDG', 'CVE', 'ZIM', 'XLE', 'LMT', 'RTX']
-CRITICAL_KEYWORDS = ['iran', 'oil', 'strait', 'hormuz', 'supply', 'war', 'attack', 'acquisition', 'buyout', 'ai', 'gpu', 'recovery', 'solar', 'earnings', 'contract']
+# הרחבנו מילות מפתח כדי לקבל יותר עדכונים בשלב הבדיקה
+CRITICAL_KEYWORDS = ['iran', 'oil', 'strait', 'war', 'attack', 'ai', 'gpu', 'recovery', 'solar', 'earnings', 'buy', 'growth', 'stock', 'market']
 
 def get_stock_data(symbol):
     try:
         ticker = yf.Ticker(symbol)
         info = ticker.info
-        
-        full_name = info.get('longName', symbol)
-        current_price = info.get('currentPrice') or info.get('regularMarketPrice')
-        target_price = info.get('targetMeanPrice')
-        
-        upside = 0
-        if current_price and target_price:
-            upside = ((target_price - current_price) / current_price) * 100
-            
         return {
-            'full_name': full_name,
-            'price': current_price,
-            'target': target_price,
-            'upside': upside
+            'full_name': info.get('longName', symbol),
+            'price': info.get('currentPrice') or info.get('regularMarketPrice'),
+            'target': info.get('targetMeanPrice')
         }
-    except:
-        return None
+    except: return None
 
-def get_formatted_message(symbol, title):
-    data = get_stock_data(symbol)
-    if not data:
-        return f"🚨 *אירוע חריג:* {symbol}\n📰 {title}"
-
-    # בניית ההודעה בעיצוב החדש
-    msg = f"🔍 *ניתוח הזדמנות: {data['full_name']}*\n"
-    msg += f"🎫 *סימול:* {symbol}\n"
-    msg += f"💵 *מחיר עדכני:* ${data['price']:.2f}\n"
-    
-    if data['target']:
-        msg += f"🎯 *יעד אנליסטים (12 ח'):* ${data['target']:.2f}\n"
-        msg += f"📈 *פוטנציאל רווח:* {data['upside']:.1f}%\n"
-    
-    msg += f"📊 *כדאיות השקעה:* {'⭐ אול-אין פוטנציאלי' if data['upside'] > 25 else '✅ מעקב חיובי'}\n"
-    msg += f"\n📰 *חדשות:* {title}"
-    
-    return msg
+def send_message(text):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    try:
+        res = requests.post(url, json={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"})
+        print(f"Telegram response: {res.status_code}") # בדיקה ב-Logs
+    except Exception as e:
+        print(f"Error sending to Telegram: {e}")
 
 def scan_market():
-    found_events = []
+    print(f"--- מתחיל סריקה על {len(WATCHLIST)} מניות ---")
+    found_any = False
     for symbol in WATCHLIST:
         try:
             ticker = yf.Ticker(symbol)
             news = ticker.news
             if not news: continue
-            for item in news[:1]:
-                title = item.get('title', '')
-                if any(word in title.lower() for word in CRITICAL_KEYWORDS):
-                    found_events.append(get_formatted_message(symbol, title))
-        except: pass
-    return found_events
-
-def send_message(text):
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"})
+            
+            # לוקח את הידיעה האחרונה ובודק מילות מפתח
+            item = news[0]
+            title = item.get('title', '')
+            if any(word in title.lower() for word in CRITICAL_KEYWORDS):
+                data = get_stock_data(symbol)
+                msg = f"🔍 *עדכון חם: {symbol}*\n📰 {title}\n"
+                if data and data['price']:
+                    msg += f"💵 מחיר: ${data['price']:.2f}"
+                send_message(msg)
+                found_any = True
+        except Exception as e:
+            print(f"Error scanning {symbol}: {e}")
+    
+    if not found_any:
+        print("לא נמצאו חדשות תואמות בסבב זה.")
 
 def main_loop():
-    send_message("📊 *מערכת הניתוח שודרגה!*\nמעכשיו תקבל כרטיס מניה מלא עם מחירים ויעדים.")
+    # הודעת בדיקה מיד עם העלייה
+    send_message("🚀 *הבוט עלה לאוויר!* מתחיל סריקה אינטנסיבית על מניות ה-IBI שלך.")
     
-    counter = 0
     while True:
-        events = scan_market()
-        for event in events:
-            send_message(event)
-        
-        counter += 1
-        if counter >= 20:
-            send_message(f"🔍 *סורק פעיל:* בודק נתונים עבור {len(WATCHLIST)} מניות קילריות.")
-            counter = 0
-            
-        time.sleep(180)
+        scan_market()
+        time.sleep(300) # סריקה כל 5 דקות כדי לא להיחסם
 
 if __name__ == "__main__":
     Thread(target=run_server).start()
