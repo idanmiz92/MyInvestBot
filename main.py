@@ -2,42 +2,35 @@ import os
 import yfinance as yf
 import requests
 import time
+from threading import Thread
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# הגדרות - המערכת תמשוך את הפרטים מה-Environment Variables ב-Render
+# --- שרת דמה כדי ש-Render לא יקרוס ---
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+
+def run_server():
+    server = HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 10000))), SimpleHTTPRequestHandler)
+    server.serve_forever()
+
+# --- הגדרות הבוט ---
 TOKEN = os.getenv("TELEGRAM_TOKEN", "8443480253:AAGADNDFa1w6EVUzq9dnZ-YoBL_LUz6uvlw")
 CHAT_ID = os.getenv("CHAT_ID", "6332442153")
-
-# רשימת מעקב אסטרטגית להזדמנויות קצה
 WATCHLIST = ['XLE', 'XOM', 'LMT', 'RTX', 'ZIM', 'GLD', 'VIXY', 'TSLA', 'NVDA']
-
-# מילות מפתח למצבי "אול-אין" ותנודתיות גיאופוליטית
-CRITICAL_KEYWORDS = [
-    'iran', 'oil', 'strait', 'hormuz', 'supply', 'sanctions', 
-    'attack', 'military', 'war', 'explosion', 'disruption',
-    'acquisition', 'merger', 'buyout', 'takeover'
-]
+CRITICAL_KEYWORDS = ['iran', 'oil', 'strait', 'hormuz', 'supply', 'sanctions', 'attack', 'military', 'war', 'explosion', 'disruption', 'acquisition', 'merger', 'buyout', 'takeover']
 
 def get_strategic_advice(symbol, title):
     title_lower = title.lower()
-    advice = f"🚨 *זיהוי הזדמנות 'אול-אין' פוטנציאלית!*\n"
-    advice += f"📈 נכס במעקב: {symbol}\n"
-    advice += f"📰 כותרת: {title}\n\n"
-    
+    advice = f"🚨 *זיהוי הזדמנות 'אול-אין' פוטנציאלית!*\n📈 נכס: {symbol}\n📰 {title}\n\n"
     if symbol in ['XLE', 'XOM', 'ZIM'] or 'oil' in title_lower:
-        advice += "⛽ *ניתוח אנרגיה/ספנות:* אירוע קריטי המשפיע על היצע הנפט הגלובלי.\n"
-        advice += "💡 *אסטרטגיה:* במקרה של חסימה במצר הורמוז, מניות אלו צפויות לזינוק אלים.\n"
-    
+        advice += "⛽ *אנרגיה/ספנות:* אירוע משפיע על היצע הנפט. זינוק פוטנציאלי במקרה של חסימה במצר הורמוז."
     elif symbol in ['LMT', 'RTX']:
-        advice += "🛡️ *ניתוח ביטחוני:* הסלמה צבאית משנה את תחזית הצמיחה של חברות ההגנה.\n"
-        advice += "💡 *אסטרטגיה:* כניסה במצבי אי-יציבות גלובלית."
-        
-    elif any(word in title_lower for word in ['acquisition', 'buyout']):
-        advice += "💰 *רכישת ענק:* אירוע M&A שיוצר ערך מיידי.\n"
-        advice += "💡 *אסטרטגיה:* השוואת מחיר הרכישה למחיר השוק."
-    
+        advice += "🛡️ *ביטחון:* הסלמה צבאית מעלה ביקוש למערכות הגנה."
     else:
-        advice += "⚡ *תנודת צמיחה:* זיהוי אירוע חריג הדורש בדיקת ווליום מיידית."
-        
+        advice += "⚡ *תנודת צמיחה:* זיהוי אירוע חריג."
     return advice
 
 def scan_market():
@@ -47,33 +40,26 @@ def scan_market():
             ticker = yf.Ticker(symbol)
             news = ticker.news
             if not news: continue
-            
-            for item in news[:3]: # סורק 3 ידיעות אחרונות לכל מניה
+            for item in news[:3]:
                 title = item.get('title', '')
                 if any(word in title.lower() for word in CRITICAL_KEYWORDS):
-                    advice = get_strategic_advice(symbol, title)
-                    found_events.append(advice)
-        except Exception as e:
-            print(f"Error scanning {symbol}: {e}")
+                    found_events.append(get_strategic_advice(symbol, title))
+        except: pass
     return found_events
 
 def send_message(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    try:
-        requests.post(url, json={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"})
-    except Exception as e:
-        print(f"Telegram error: {e}")
+    requests.post(url, json={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"})
 
 def main():
-    print("🤖 סורק ה-All-In התחיל לעבוד...")
-    send_message("🎯 *מערכת הציד עודכנה!*\nמעכשיו אני סורק עבורך נפט, ביטחון, איראן והזדמנויות רכישה 24/7.")
+    # הפעלת שרת הדמה בשרשור נפרד
+    Thread(target=run_server).start()
     
+    send_message("🎯 *המערכת עלתה לאוויר (גרסה יציבה)!*\nסורק כעת נפט, ביטחון ואיראן.")
     while True:
         events = scan_market()
         for event in events:
             send_message(event)
-        
-        # המתנה של 3 דקות בין סריקות
         time.sleep(180)
 
 if __name__ == "__main__":
