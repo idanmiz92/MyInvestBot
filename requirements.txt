@@ -1,4 +1,5 @@
 yfinance
 requests
+pandas
 beautifulsoup4
-lxml
+flask
