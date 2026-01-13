@@ -47,6 +47,7 @@ def get_full_report(title_prefix):
     send_message(report)
 
 def main_loop():
+    # שורה 52 - הודעת האישור החדשה
     send_message("⚡ *עדכון הופעל:* הבוט יעדכן אותך כל שעה שהכל דבש.")
     
     while True:
@@ -65,7 +66,7 @@ def main_loop():
             get_full_report("סיכום יום מסחר - IBI Portfolio")
             time.sleep(61)
 
-        # בדיקת דופק שעתית (בכל שעה עגולה)
+        # בדיקת דופק שעתית - שורה 73
         elif current_min == "00":
             nvda_p = get_stock_price('NVDA')
             price_str = f"(NVDA: ${nvda_p:.2f})" if nvda_p else ""
