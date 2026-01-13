@@ -2,6 +2,8 @@ import os
 import yfinance as yf
 import requests
 import time
+from datetime import datetime
+import pytz
 from threading import Thread
 from flask import Flask
 
@@ -18,62 +20,59 @@ def run_server():
 # --- הגדרות ---
 TOKEN = os.getenv("TELEGRAM_TOKEN", "8443480253:AAGADNDFa1w6EVUzq9dnZ-YoBL_LUz6uvlw")
 CHAT_ID = os.getenv("CHAT_ID", "6332442153")
-
 WATCHLIST = ['NVDA', 'ARM', 'SEDG', 'CVE', 'ZIM', 'XLE', 'LMT', 'RTX']
-# הרחבנו מילות מפתח כדי לקבל יותר עדכונים בשלב הבדיקה
-CRITICAL_KEYWORDS = ['iran', 'oil', 'strait', 'war', 'attack', 'ai', 'gpu', 'recovery', 'solar', 'earnings', 'buy', 'growth', 'stock', 'market']
-
-def get_stock_data(symbol):
-    try:
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
-        return {
-            'full_name': info.get('longName', symbol),
-            'price': info.get('currentPrice') or info.get('regularMarketPrice'),
-            'target': info.get('targetMeanPrice')
-        }
-    except: return None
 
 def send_message(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    try:
-        res = requests.post(url, json={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"})
-        print(f"Telegram response: {res.status_code}") # בדיקה ב-Logs
-    except Exception as e:
-        print(f"Error sending to Telegram: {e}")
+    requests.post(url, json={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"})
 
-def scan_market():
-    print(f"--- מתחיל סריקה על {len(WATCHLIST)} מניות ---")
-    found_any = False
+def get_stock_price(symbol):
+    try:
+        ticker = yf.Ticker(symbol)
+        return ticker.fast_info['last_price']
+    except: return None
+
+def get_full_report(title_prefix):
+    report = f"📊 *{title_prefix}*\n\n"
     for symbol in WATCHLIST:
         try:
             ticker = yf.Ticker(symbol)
-            news = ticker.news
-            if not news: continue
-            
-            # לוקח את הידיעה האחרונה ובודק מילות מפתח
-            item = news[0]
-            title = item.get('title', '')
-            if any(word in title.lower() for word in CRITICAL_KEYWORDS):
-                data = get_stock_data(symbol)
-                msg = f"🔍 *עדכון חם: {symbol}*\n📰 {title}\n"
-                if data and data['price']:
-                    msg += f"💵 מחיר: ${data['price']:.2f}"
-                send_message(msg)
-                found_any = True
-        except Exception as e:
-            print(f"Error scanning {symbol}: {e}")
-    
-    if not found_any:
-        print("לא נמצאו חדשות תואמות בסבב זה.")
+            data = ticker.fast_info
+            price = data['last_price']
+            change = ((price / data['previous_close']) - 1) * 100
+            emoji = "🟢" if change >= 0 else "🔴"
+            report += f"{emoji} *{symbol}*: ${price:.2f} ({change:+.2f}%)\n"
+        except:
+            report += f"⚪ *{symbol}*: שגיאה\n"
+    send_message(report)
 
 def main_loop():
-    # הודעת בדיקה מיד עם העלייה
-    send_message("🚀 *הבוט עלה לאוויר!* מתחיל סריקה אינטנסיבית על מניות ה-IBI שלך.")
+    send_message("⚡ *עדכון הופעל:* הבוט יעדכן אותך כל שעה שהכל דבש.")
     
     while True:
-        scan_market()
-        time.sleep(300) # סריקה כל 5 דקות כדי לא להיחסם
+        tz_israel = pytz.timezone('Asia/Jerusalem')
+        now = datetime.now(tz_israel)
+        current_time = now.strftime("%H:%M")
+        current_min = now.strftime("%M")
+        
+        # דו"ח פתיחה (16:25)
+        if current_time == "16:25":
+            get_full_report("דו\"ח טרום פתיחה - IBI Portfolio")
+            time.sleep(61)
+            
+        # דו"ח סגירה (23:05)
+        elif current_time == "23:05":
+            get_full_report("סיכום יום מסחר - IBI Portfolio")
+            time.sleep(61)
+
+        # בדיקת דופק שעתית (בכל שעה עגולה)
+        elif current_min == "00":
+            nvda_p = get_stock_price('NVDA')
+            price_str = f"(NVDA: ${nvda_p:.2f})" if nvda_p else ""
+            send_message(f"😎 עד כה יום בן זונה, לא קרה כלום... {price_str}")
+            time.sleep(61)
+        
+        time.sleep(30)
 
 if __name__ == "__main__":
     Thread(target=run_server).start()
