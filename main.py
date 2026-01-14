@@ -66,9 +66,7 @@ def health_check():
 
     # 3. עדכון שעה עגולה (יום בן זונה) - ירוץ בכל שעה שאינה 16 או 23
     elif current_hour != last_sent_hour:
-        nvda_p = get_stock_price('NVDA')
-        price_str = f"(NVDA: ${nvda_p:.2f})" if nvda_p else ""
-        send_message(f"😎 *Mizrachi Markets:*\nעד כה יום בן זונה, לא קרה כלום... {price_str}")
+        send_message(f"😎 *Mizrachi Markets:*\nעד כה יום בן זונה, לא קרה כלום...")
         last_sent_hour = current_hour
 
     return f"Bot is Live! Last sent hour: {last_sent_hour}", 200
@@ -76,4 +74,5 @@ def health_check():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
+
 
