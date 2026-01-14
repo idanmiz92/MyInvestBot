@@ -21,19 +21,15 @@ def send_message(text):
         pass
 
 def get_market_insight(symbol, change, upside=None):
-    """מערכת ה'קביים' - פרשנות פשוטה לנתונים יבשים"""
-    if symbol == '^GSPC' or symbol == '^NDX':
-        return "תמונת מצב שוק כללית"
-    if symbol == 'BTC-USD':
-        return "סנטימנט נכסים דיגיטליים"
-    if symbol == 'CL=F':
-        return "מדד אנרגיה ואינפלציה"
+    if symbol == '^GSPC' or symbol == '^NDX': return "תמונת מצב שוק כללית"
+    if symbol == 'BTC-USD': return "סנטימנט נכסים דיגיטליים"
+    if symbol == 'CL=F': return "מדד אנרגיה ואינפלציה"
         
     if upside is not None:
-        if upside > 20: return "🚀 פוטנציאל משמעותי לפי האנליסטים"
+        if upside > 20: return "🚀 פוטנציאל משמעותי (אנליסטים)"
         if upside > 5: return "✅ מגמה חיובית - צפי לעלייה"
-        if upside < -5: return "⚠️ זהירות: נסחרת מעל מחיר היעד"
-        return "⚖️ מחיר המניה קרוב לשווי המוערך"
+        if upside < -5: return "⚠️ זהירות: נסחרת מעל יעד"
+        return "⚖️ מחיר קרוב לשווי המוערך"
     return "תנודות מסחר יומיות"
 
 def get_full_report(title_prefix):
@@ -45,31 +41,38 @@ def get_full_report(title_prefix):
     for symbol in WATCHLIST:
         try:
             ticker = yf.Ticker(symbol)
+            info = ticker.info
             fast = ticker.fast_info
+            
             price = fast['last_price']
             change = ((price / fast['previous_close']) - 1) * 100
+            day_low = info.get('dayLow', 0)
+            day_high = info.get('dayHigh', 0)
             
-            # עיצוב אייקון לפי שינוי
             emoji = "🟢" if change > 0.5 else ("🔴" if change < -0.5 else "⚪")
             
-            # כותרת המניה
+            # כותרת ומחיר
             line = f"{emoji} *{symbol}* | ${price:.2f} ({change:+.2f}%)\n"
             
-            # נתוני יעד ופרשנות
+            # טווח יומי
+            if day_low and day_high:
+                line += f"📉 טווח: ${day_low:.2f} - ${day_high:.2f}\n"
+            
+            # יעד אנליסטים
             upside_val = None
             if "^" not in symbol and "-" not in symbol and "=" not in symbol:
-                target = ticker.info.get('targetMeanPrice')
+                target = info.get('targetMeanPrice')
                 if target:
                     upside_val = ((target / price) - 1) * 100
                     line += f"🎯 יעד: ${round(target, 2)} ({round(upside_val, 1):+g}%)\n"
             
-            # הוספת ה'קביים'
+            # תובנה
             insight = get_market_insight(symbol, change, upside_val)
             line += f"💡 *תובנה:* {insight}\n"
             
             report += line + "──────────────────\n"
         except:
-            report += f"❌ *{symbol}*: שגיאה במשיכת נתונים\n──────────────────\n"
+            report += f"❌ *{symbol}*: שגיאה בנתונים\n──────────────────\n"
             
     report += "\n🔗 [Dan Ives - טכנולוגיה](https://twitter.com/DivesTech)\n"
     report += "🔗 [Kobeissi - מקרו](https://twitter.com/KobeissiLetter)"
@@ -87,7 +90,6 @@ def health_check():
         get_full_report("Mizrachi Markets: סטטיסטיקה יומית")
         return "Report sent!", 200
 
-    # דוחות קבועים
     if "16:25" <= current_time <= "16:45" and last_sent_hour != 16:
         get_full_report("Mizrachi Markets: סטטיסטיקה יומית (טרום פתיחה)")
         last_sent_hour = 16
