@@ -12,7 +12,6 @@ app = Flask(__name__)
 TOKEN = os.getenv("TELEGRAM_TOKEN", "8443480253:AAGADNDFa1w6EVUzq9dnZ-YoBL_LUz6uvlw")
 CHAT_ID = os.getenv("CHAT_ID", "6332442153")
 
-# רשימת המעקב שלך
 WATCHLIST = ['^GSPC', '^NDX', 'BTC-USD', 'CL=F', 'NVDA', 'ARM', 'SEDG', 'CVE', 'ZIM', 'XLE', 'LMT', 'RTX']
 
 last_sent_hour = -1
@@ -36,19 +35,20 @@ def get_full_report(title_prefix):
             
             line = f"{emoji} *{symbol}*: ${price:.2f} ({change:+.2f}%)"
             
-            # הצלבת נתונים עם אנליסטים (רק למניות)
+            # הצלבת אנליסטים (רק למניות)
             if "^" not in symbol and "-" not in symbol and "=" not in symbol:
-                target = ticker.info.get('targetMeanPrice')
-                if target:
-                    upside = ((target / price) - 1) * 100
-                    # שימוש ב-round כדי לשמור על דו"ח נקי
-                    line += f"\n🎯 *Target:* ${round(target, 2)} (Potential: {round(upside, 1):+g}%)"
+                try:
+                    target = ticker.info.get('targetMeanPrice')
+                    if target:
+                        upside = ((target / price) - 1) * 100
+                        line += f"\n🎯 *Target:* ${round(target, 2)} (Potential: {round(upside, 1):+g}%)"
+                except:
+                    pass
             
             report += line + "\n\n"
         except Exception:
             report += f"⚪ *{symbol}*: טוען נתונים...\n\n"
             
-    # קישורי ביטחון שדה בתחתית הדו"ח
     report += "🔍 *ביטחון שדה - אנליסטים:*\n"
     report += "🔗 [Dan Ives](https://twitter.com/DivesTech) | [Kobeissi](https://twitter.com/KobeissiLetter)\n"
     
@@ -62,12 +62,12 @@ def health_check():
     current_hour = now.hour
     current_time = now.strftime("%H:%M")
 
-    # בדיקת TEST ידנית דרך הדפדפן
-   if request.args.get('test'):
-    get_full_report("🚀 טיל אבוחשמיל: דו\"ח בדיקת מערכת")
-    return "Report sent to Telegram!", 200
+    # הטריגר לטסט - הוספתי הדפסה ללוגים ליתר ביטחון
+    if request.args.get('test'):
+        print("Test trigger received!")
+        get_full_report("🚀 טיל אבוחשמיל: דו\"ח בדיקת מערכת")
+        return "Report sent to Telegram!", 200
 
-    # דוחות קבועים
     if "16:25" <= current_time <= "16:55":
         if last_sent_hour != 16: 
             get_full_report("Mizrachi Markets: דו\"ח טרום פתיחה")
@@ -85,4 +85,3 @@ def health_check():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
-
