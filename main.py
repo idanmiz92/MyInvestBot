@@ -63,9 +63,9 @@ def health_check():
     current_time = now.strftime("%H:%M")
 
     # בדיקת TEST ידנית דרך הדפדפן
-    if request.args.get('test'):
-        get_full_report("🚀 טיל אבוחשמיל: דו\"ח בדיקת מערכת")
-        return "Report sent to Telegram!", 200
+   if request.args.get('test'):
+    get_full_report("🚀 טיל אבוחשמיל: דו\"ח בדיקת מערכת")
+    return "Report sent to Telegram!", 200
 
     # דוחות קבועים
     if "16:25" <= current_time <= "16:55":
@@ -85,3 +85,4 @@ def health_check():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
+
