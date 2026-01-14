@@ -16,7 +16,7 @@ CHAT_ID = os.getenv("CHAT_ID", "6332442153")
 WATCHLIST = ['^GSPC', '^NDX', 'BTC-USD', 'CL=F', 'NVDA', 'ARM', 'SEDG', 'CVE', 'ZIM', 'XLE', 'LMT', 'RTX']
 
 # משתנה גלובלי לזכור מתי נשלח העדכון האחרון
-last_sent_hour = -1
+last_sent_hour = -99
 
 def send_message(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -87,3 +87,4 @@ def health_check():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
+
