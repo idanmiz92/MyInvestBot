@@ -11,8 +11,7 @@ app = Flask(__name__)
 # --- הגדרות ---
 TOKEN = os.getenv("TELEGRAM_TOKEN", "8443480253:AAGADNDFa1w6EVUzq9dnZ-YoBL_LUz6uvlw")
 CHAT_ID = os.getenv("CHAT_ID", "6332442153")
-WATCHLIST = ['NVDA', 'ARM', 'SEDG', 'CVE', 'ZIM', 'XLE', 'LMT', 'RTX']
-
+WATCHLIST = ['^GSPC', '^NDX', 'BTC-USD', 'CL=F', 'NVDA', 'ARM', 'SEDG', 'CVE', 'ZIM', 'XLE', 'LMT', 'RTX']
 # משתנה גלובלי לזכור מתי נשלח העדכון האחרון
 last_sent_hour = -1
 
@@ -74,5 +73,6 @@ def health_check():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
+
 
 
