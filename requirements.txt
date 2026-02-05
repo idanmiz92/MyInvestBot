@@ -1,6 +1,5 @@
-yfinance
+Flask
 requests
-pandas
-beautifulsoup4
-flask
+yfinance==0.2.40
 pytz
+gunicorn
