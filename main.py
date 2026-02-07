@@ -8,17 +8,16 @@ API_KEY = "4b1d7ca71ff443118c6e31eb40044671"
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# --- מילון הציד: כאן אתה מנהל את המטרות שלך ---
-# תובנות (Insight) צריכות להיות קצרות וחדות - כמו פקודת מבצע
+# מילון הציד המשודרג
 ANALYST_DATA = {
-    'SPY': ['S&P 500 ETF', '6,200', 'Market backbone. Bullish above 5,800'],
-    'VIX': ['Fear Index', '< 15', 'Risk gauge. Monitor for volatility spikes'],
-    'GOLD': ['Gold Spot', '2,800', 'Safe haven play | Geopolitical hedge'],
-    'NVDA': ['NVIDIA Corp', '200', 'AI Leader | Strong institutional demand'],
-    'ARM': ['ARM Holdings', '160', '🎯 MERGER TARGET | High acquisition probability'],
-    'ZIM': ['ZIM Integrated', '25', 'Logistics momentum | Dividend focus'],
-    'LMT': ['Lockheed Martin', '650', 'Defense lead | Geopolitical tension play'],
-    'BTC/USD': ['Bitcoin', '100,000', 'Digital gold | ETF inflows strong']
+    'SPY': ['S&P 500 ETF', 6200, 'Market backbone.'],
+    'VIX': ['Fear Index', 15, 'Risk gauge.'],
+    'GOLD': ['Gold Spot', 2800, 'Geopolitical hedge.'],
+    'NVDA': ['NVIDIA Corp', 200, 'AI Leader | Strong demand'],
+    'ARM': ['ARM Holdings', 160, '🎯 MERGER TARGET | High probability'],
+    'ZIM': ['ZIM Integrated', 25, 'Logistics momentum'],
+    'LMT': ['Lockheed Martin', 650, 'Defense contracts focus'],
+    'BTC/USD': ['Bitcoin', 100000, 'Digital gold']
 }
 
 def send_telegram(text):
@@ -28,12 +27,12 @@ def send_telegram(text):
 
 @app.route('/')
 def home():
+    # בדיקה אם זו הרצה ידנית/זמנית (הדו"ח הרגיל)
     if request.args.get('test'):
         tz = pytz.timezone('Asia/Jerusalem')
         current_time = datetime.now(tz).strftime('%d/%m/%Y | %H:%M')
         
-        # כותרת המותג שלך
-        msg = f"🔍 *MIZRACHI MARKETS | STRATEGIC HUNTER*\n"
+        msg = f"🏛 *MIZRACHI MARKETS | HUNTER REPORT*\n"
         msg += f"📅 {current_time}\n"
         msg += "──────────────────\n\n"
         
@@ -42,37 +41,40 @@ def home():
                 url = f"https://api.twelvedata.com/quote?symbol={sym}&apikey={API_KEY}"
                 data = requests.get(url).json()
                 
-                price = data.get('close') or data.get('price')
-                change = data.get('percent_change') or "0"
+                price = float(data.get('close') or data.get('price'))
+                change = float(data.get('percent_change') or 0)
                 
                 full_name = info[0]
                 target = info[1]
                 insight = info[2]
                 
-                if price:
-                    # סימון מיוחד למטרות מיזוג (אם המילה MERGER מופיעה בתובנה)
-                    prefix = "🔥" if "MERGER" in insight.upper() else "🎫"
-                    trend_icon = "📈" if float(change) > 0 else "📉"
-                    
-                    msg += f"{prefix} *{full_name}* ({sym})\n"
-                    msg += f"💵 Price: `${float(price):,.2f}` ({change}% {trend_icon})\n"
-                    msg += f"🎯 Target: `${target}`\n"
-                    msg += f"💡 _Insight: {insight}_\n\n"
-                else:
-                    msg += f"🎫 *{full_name}* ({sym})\n  `Market Status: Offline`\n\n"
+                # חישוב מרחק מהיעד
+                distance = ((target - price) / price) * 100
                 
-                time.sleep(1)
+                # בחירת אימוג'י לפי מצב
+                if "MERGER" in insight.upper():
+                    icon = "🔥"
+                elif distance < 5:
+                    icon = "🎯" # קרוב מאוד ליעד
+                else:
+                    icon = "🟢" if change > 0 else "🔴"
+                
+                msg += f"{icon} *{full_name}* ({sym})\n"
+                msg += f"💵 Price: `${price:,.2f}` ({change:.2f}%)\n"
+                msg += f"🎯 Target: `${target:,.2f}` | *Potential: {distance:.1f}%*\n"
+                msg += f"💡 _Insight: {insight}_\n\n"
+                
+                time.sleep(0.8)
             except:
-                msg += f"⚠️ *{sym}*: Data Fetch Error\n\n"
+                msg += f"⚠️ *{sym}*: Skip (Data Error)\n\n"
         
-        msg += "──────────────────\n"
-        msg += "🚀 *ACTIONABLE ALERTS:* \n• _Focus on ARM/NVDA for sector consolidation._\n"
         msg += "──────────────────\n"
         msg += "📊 _Mizrachi Markets Intelligence_"
         
         send_telegram(msg)
-        return "Hunter Report Sent", 200
-    return "Mizrachi Markets Active", 200
+        return "Report Sent", 200
+    
+    return "Mizrachi Hunter Active", 200
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
