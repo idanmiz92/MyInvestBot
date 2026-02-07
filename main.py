@@ -9,7 +9,6 @@ TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 # --- מילון האנליסט: כאן אתה קובע את היעדים והתובנות ---
-# פורמט: 'SYMBOL': ['Full Name', 'Target Price', 'Insight']
 ANALYST_DATA = {
     'SPY': ['S&P 500 ETF', '6,200', 'Trend: Bullish | Support at 5,800'],
     'VIX': ['Fear Index', '< 15', 'Monitor for market stress'],
@@ -38,26 +37,31 @@ def home():
         
         for sym, info in ANALYST_DATA.items():
             try:
-                # משיכת מחיר עדכני
+                # משיכת נתונים מ-Twelve Data
                 url = f"https://api.twelvedata.com/quote?symbol={sym}&apikey={API_KEY}"
                 data = requests.get(url).json()
                 
                 price = data.get('close') or data.get('price')
+                change = data.get('percent_change') or "0"
+                
                 full_name = info[0]
                 target = info[1]
                 insight = info[2]
                 
                 if price:
+                    icon = "🟢" if float(change) > 0 else "🔴"
                     msg += f"🎫 *{full_name}* ({sym})\n"
-                    msg += f"💵 Price: `${float(price):,.2f}`\n"
+                    msg += f"💵 Price: `${float(price):,.2f}` ({change}% {icon})\n"
                     msg += f"🎯 Target: `${target}`\n"
                     msg += f"💡 _Insight: {insight}_\n\n"
                 else:
-                    msg += f"🎫 *{full_name}* ({sym})\n  `Market Data Offline`\n\n"
+                    msg += f"🎫 *{full_name}* ({sym})\n  `Market Status: Check Required`\n\n"
                 
-                time.sleep(1) # שמירה על ה-API שלא ייחסם
-            except:
-                msg += f"🎫 *{sym}* - `Error fetching data`\n\n"
+                # השהייה קלה למניעת חסימה מה-API
+                time.sleep(1)
+                
+            except Exception as e:
+                msg += f"⚠️ *{sym}*: Data Fetch Error\n\n"
         
         msg += "──────────────────\n"
         msg += "🚀 *MERGER WATCHLIST:* \n• _ARM, NVDA, LMT under review for M&A activity._\n"
