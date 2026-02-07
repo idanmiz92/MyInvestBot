@@ -8,17 +8,17 @@ API_KEY = "4b1d7ca71ff443118c6e31eb40044671"
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# רשימת נכסים אסטרטגיים + מניות "אול אין"
-STOCKS = {
-    'SPY': 'S&P 500', 
-    'VIX': 'VIX (Fear Index)', 
-    'GOLD': 'Gold',
-    'EUR/USD': 'EUR/USD',
-    'BTC/USD': 'Bitcoin',
-    'NVDA': 'NVIDIA', 
-    'ARM': 'ARM Holdings', 
-    'ZIM': 'ZIM Integrated',
-    'LMT': 'Lockheed Martin'
+# --- מילון האנליסט: כאן אתה קובע את היעדים והתובנות ---
+# פורמט: 'SYMBOL': ['Full Name', 'Target Price', 'Insight']
+ANALYST_DATA = {
+    'SPY': ['S&P 500 ETF', '6,200', 'Trend: Bullish | Support at 5,800'],
+    'VIX': ['Fear Index', '< 15', 'Monitor for market stress'],
+    'GOLD': ['Gold Spot', '2,800', 'Safe haven play | Geopolitical hedge'],
+    'NVDA': ['NVIDIA Corp', '200', 'AI dominance | Potential split rumors'],
+    'ARM': ['ARM Holdings', '160', 'High growth | Merger target candidate'],
+    'ZIM': ['ZIM Integrated', '25', 'Shipping rates volatility | Dividend play'],
+    'LMT': ['Lockheed Martin', '650', 'Defense contracts increasing'],
+    'BTC/USD': ['Bitcoin', '100,000', 'Digital gold | ETF inflows strong']
 }
 
 def send_telegram(text):
@@ -32,46 +32,41 @@ def home():
         tz = pytz.timezone('Asia/Jerusalem')
         current_time = datetime.now(tz).strftime('%d/%m/%Y | %H:%M')
         
-        msg = f"⚔️ *SBX CAPITAL | STRATEGIC REPORT*\n"
+        msg = f"⚔️ *SBX CAPITAL | ANALYST REPORT*\n"
         msg += f"📅 {current_time}\n"
         msg += "──────────────────\n\n"
         
-        for sym, name in STOCKS.items():
+        for sym, info in ANALYST_DATA.items():
             try:
-                # משיכת מחיר + אחוז שינוי (לזיהוי תזוזות חריגות)
+                # משיכת מחיר עדכני
                 url = f"https://api.twelvedata.com/quote?symbol={sym}&apikey={API_KEY}"
                 data = requests.get(url).json()
                 
                 price = data.get('close') or data.get('price')
-                change = data.get('percent_change')
+                full_name = info[0]
+                target = info[1]
+                insight = info[2]
                 
                 if price:
-                    # הוספת אימוג'י לפי מגמה
-                    icon = "📈" if float(change or 0) > 0 else "📉"
-                    msg += f"▫️ *{name}* {icon}\n  Price: `${float(price):,.2f}`\n  Change: `{change}%`\n\n"
+                    msg += f"🎫 *{full_name}* ({sym})\n"
+                    msg += f"💵 Price: `${float(price):,.2f}`\n"
+                    msg += f"🎯 Target: `${target}`\n"
+                    msg += f"💡 _Insight: {insight}_\n\n"
                 else:
-                    msg += f"▫️ *{name}*\n  `Check Market Status`\n\n"
+                    msg += f"🎫 *{full_name}* ({sym})\n  `Market Data Offline`\n\n"
                 
-                time.sleep(0.8)
+                time.sleep(1) # שמירה על ה-API שלא ייחסם
             except:
-                msg += f"▫️ *{name}*\n  `Service Unavailable`\n\n"
+                msg += f"🎫 *{sym}* - `Error fetching data`\n\n"
         
-        # --- חלק החדשות (זיהוי מיזוגים ותנודות פוליטיות) ---
-        msg += "📢 *TOP MARKET INSIGHTS:*\n"
-        try:
-            news_url = f"https://api.twelvedata.com/news?symbol=SPY,NVDA&apikey={API_KEY}"
-            news_data = requests.get(news_url).json().get('article', [])[:3]
-            for article in news_data:
-                msg += f"• _{article['title']}_\n"
-        except:
-            msg += "• _No urgent alerts detected._\n"
-
-        msg += "\n──────────────────\n"
-        msg += "💡 _Strategic Alerts by SBX Intelligence_"
+        msg += "──────────────────\n"
+        msg += "🚀 *MERGER WATCHLIST:* \n• _ARM, NVDA, LMT under review for M&A activity._\n"
+        msg += "──────────────────\n"
+        msg += "💡 _Strategic Data by SBX Capital_"
         
         send_telegram(msg)
-        return "Strategic Report Sent", 200
-    return "SBX Intelligence Active", 200
+        return "Analyst Report Sent", 200
+    return "SBX Analyst Bot Active", 200
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
