@@ -8,11 +8,15 @@ API_KEY = "4b1d7ca71ff443118c6e31eb40044671"
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# מילון הציד - הוספנו 'Alert_Threshold' לכל מניה
+# מילון הציד האסטרטגי: [שם, יעד, תובנה, סף התראה באחוזים]
 ANALYST_DATA = {
-    'SPY': ['S&P 500 ETF', 6200, 'Market backbone.', 1.5], # התראה בשינוי של 1.5%
-    'NVDA': ['NVIDIA Corp', 200, 'AI Leader', 3.0],      # התראה בשינוי של 3%
-    'ARM': ['ARM Holdings', 160, '🎯 MERGER TARGET', 2.5],
+    'SPY': ['S&P 500 ETF', 6200, 'Market backbone.', 1.5],
+    'VIX': ['Fear Index', 15, 'Risk gauge.', 5.0],
+    'GOLD': ['Gold Spot', 2800, 'Geopolitical hedge.', 2.0],
+    'NVDA': ['NVIDIA Corp', 200, 'AI Leader | Strong demand', 3.0],
+    'ARM': ['ARM Holdings', 160, '🎯 MERGER TARGET | High probability', 2.5],
+    'ZIM': ['ZIM Integrated', 25, 'Logistics momentum', 4.0],
+    'LMT': ['Lockheed Martin', 650, 'Defense lead', 2.0],
     'BTC/USD': ['Bitcoin', 100000, 'Digital gold', 4.0]
 }
 
@@ -23,43 +27,58 @@ def send_telegram(text):
 
 @app.route('/')
 def home():
-    mode = request.args.get('mode') # מצב התראה שקט
-    is_test = request.args.get('test') # דו"ח מלא
+    mode = request.args.get('mode') # מצב התראה (כל 30 דקות)
+    is_test = request.args.get('test') # דו"ח מלא (פעמיים ביום)
     
     tz = pytz.timezone('Asia/Jerusalem')
     current_time = datetime.now(tz).strftime('%H:%M')
-    
-    if is_test:
-        # כאן נכנס הקוד של הדו"ח המלא ששלחתי לך קודם (לשלוח פעמיים ביום)
-        # ... (קיצרתי כאן כדי להתמקד בלוגיקת הצייד)
-        return "Full Report Sent", 200
 
-    if mode == 'alert':
-        alerts_found = []
+    # --- מצב 1: דו"ח אסטרטגי מלא ---
+    if is_test:
+        msg = f"🏛 *MIZRACHI MARKETS | HUNTER REPORT*\n📅 {datetime.now(tz).strftime('%d/%m/%Y | %H:%M')}\n"
+        msg += "──────────────────\n\n"
         for sym, info in ANALYST_DATA.items():
             try:
                 url = f"https://api.twelvedata.com/quote?symbol={sym}&apikey={API_KEY}"
                 data = requests.get(url).json()
-                
                 price = float(data.get('close') or data.get('price'))
                 change = float(data.get('percent_change') or 0)
-                threshold = info[3]
+                target = info[1]
+                distance = ((target - price) / price) * 100
+                icon = "🔥" if "MERGER" in info[2].upper() else ("🟢" if change > 0 else "🔴")
                 
-                # הצייד בפעולה: בודק אם השינוי חורג מהסף שהגדרנו
-                if abs(change) >= threshold:
-                    icon = "🚀" if change > 0 else "⚠️"
-                    alerts_found.append(f"{icon} *{sym} MOVEMENT:* {change:.2f}%\nPrice: `${price:,.2f}`\n_{info[2]}_")
-                
+                msg += f"{icon} *{info[0]}* ({sym})\n"
+                msg += f"💵 Price: `${price:,.2f}` ({change:.2f}%)\n"
+                msg += f"🎯 Target: `${target:,.2f}` | *Potential: {distance:.1f}%*\n"
+                msg += f"💡 _Insight: {info[2]}_\n\n"
                 time.sleep(1)
-            except:
-                continue
+            except: continue
+        msg += "──────────────────\n📊 _Mizrachi Markets Intelligence_"
+        send_telegram(msg)
+        return "Full Report Sent", 200
+
+    # --- מצב 2: התראות צייד (מצב שקט) ---
+    if mode == 'alert':
+        alerts = []
+        for sym, info in ANALYST_DATA.items():
+            try:
+                url = f"https://api.twelvedata.com/quote?symbol={sym}&apikey={API_KEY}"
+                data = requests.get(url).json()
+                price = float(data.get('close') or data.get('price'))
+                change = float(data.get('percent_change') or 0)
+                if abs(change) >= info[3]: # בדיקה מול סף ההתראה
+                    icon = "🚀" if change > 0 else "⚠️"
+                    alerts.append(f"{icon} *{sym} MOVEMENT:* {change:.2f}%\nPrice: `${price:,.2f}`\n_{info[2]}_")
+                time.sleep(1)
+            except: continue
         
-        if alerts_found:
-            msg = f"🚨 *MIZRACHI MARKETS ALERT* ({current_time})\n\n"
-            msg += "\n\n".join(alerts_found)
+        if alerts:
+            msg = f"🚨 *MIZRACHI MARKETS ALERT* ({current_time})\n\n" + "\n\n".join(alerts)
             send_telegram(msg)
-            return "Alerts Sent", 200
-        
-        return "No significant movement detected", 200
+        return "Alerts Processed", 200
 
     return "Mizrachi Hunter System Active", 200
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
