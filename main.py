@@ -1,4 +1,4 @@
-import os, requests, pytz
+import os, requests, pytz, time
 from flask import Flask, request
 from datetime import datetime
 
@@ -8,17 +8,17 @@ API_KEY = "4b1d7ca71ff443118c6e31eb40044671"
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# סימבולים מעודכנים עבור Twelve Data
+# סימבולים בפורמט שהכי קל ל-API למשוך בחינם
 STOCKS = {
-    'SPX': 'S&P 500', 
-    'IXIC': 'Nasdaq 100', 
+    'SPY': 'S&P 500 (ETF)', 
+    'QQQ': 'Nasdaq 100 (ETF)', 
     'BTC/USD': 'Bitcoin',
     'NVDA': 'NVIDIA', 
     'ARM': 'ARM Holdings', 
     'ZIM': 'ZIM Integrated',
     'LMT': 'Lockheed Martin', 
     'RTX': 'Raytheon', 
-    'CL': 'Crude Oil'
+    'CL=F': 'Crude Oil'
 }
 
 def send_telegram(text):
@@ -32,27 +32,28 @@ def home():
         tz = pytz.timezone('Asia/Jerusalem')
         current_time = datetime.now(tz).strftime('%d/%m/%Y | %H:%M')
         
-        # בניית הודעה בסגנון יוקרתי (SBX Style)
         msg = f"⚔️ *SBX CAPITAL | MARKET REPORT*\n"
         msg += f"📅 {current_time}\n"
         msg += "──────────────────\n\n"
         
         for sym, name in STOCKS.items():
             try:
-                # משיכת נתון לכל מניה בנפרד לדיוק מקסימלי
+                # הוספנו הפסקה קטנה בין בקשה לבקשה כדי לא להיחסם
                 url = f"https://api.twelvedata.com/price?symbol={sym}&apikey={API_KEY}"
-                data = requests.get(url).json()
-                price = data.get('price')
+                response = requests.get(url).json()
+                price = response.get('price')
                 
                 if price:
                     msg += f"▫️ *{name}* \n  `${float(price):,.2f}`\n\n"
                 else:
-                    msg += f"▫️ *{name}* \n  `Not Available`\n\n"
+                    msg += f"▫️ *{name}* \n  `Market Closed/NA`\n\n"
+                
+                time.sleep(1) # השהייה של שניה בין מניה למניה
             except:
-                msg += f"▫️ *{name}* \n  `Error`\n\n"
+                msg += f"▫️ *{name}* \n  `Service Busy`\n\n"
         
         msg += "──────────────────\n"
-        msg += "💡 _Live Data by Twelve Data API_"
+        msg += "💡 _Live Data by Twelve Data_"
         
         send_telegram(msg)
         return "Report Sent", 200
