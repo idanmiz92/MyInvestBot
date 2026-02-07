@@ -4,12 +4,10 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# הגדרות
 API_KEY = "4b1d7ca71ff443118c6e31eb40044671"
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# רשימת המניות והשמות
 STOCKS = {
     'SPX': 'S&P 500', 'IXIC': 'Nasdaq 100', 'BTC/USD': 'Bitcoin',
     'NVDA': 'NVIDIA', 'ARM': 'ARM Holdings', 'ZIM': 'ZIM Integrated',
@@ -24,29 +22,24 @@ def send_telegram(text):
 
 @app.route('/')
 def home():
-    # בדיקה ידנית דרך הדפדפן
     if request.args.get('test'):
         symbols = ",".join(STOCKS.keys())
         url = f"https://api.twelvedata.com/price?symbol={symbols}&apikey={API_KEY}"
-        
         try:
             data = requests.get(url).json()
             tz = pytz.timezone('Asia/Jerusalem')
             msg = f"📊 *דו''ח מניות SBX* ({datetime.now(tz).strftime('%H:%M')})\n"
             msg += "──────────────────\n"
-            
             for sym, name in STOCKS.items():
                 price = data.get(sym, {}).get('price')
                 if price:
                     msg += f"🔹 *{name}*: ${float(price):.2f}\n"
                 else:
                     msg += f"🔹 *{name}*: N/A\n"
-            
             send_telegram(msg)
             return "Report Sent", 200
         except Exception as e:
             return f"Error: {str(e)}", 500
-            
     return "Bot is Running", 200
 
 if __name__ == "__main__":
