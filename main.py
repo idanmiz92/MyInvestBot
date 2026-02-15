@@ -18,6 +18,11 @@ ANALYST_DATA = {
     'BTC/USD': ['Bitcoin', 100000, 'Digital Gold', 4.0]
 }
 
+# נתיב חדש ל-Health Check - ימנע קריסות של Render
+@app.route('/health')
+def health():
+    return "OK", 200
+
 def send_telegram(text):
     if not TOKEN or not CHAT_ID: return
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -36,13 +41,10 @@ def home():
     try:
         url = f"https://api.twelvedata.com/quote?symbol={symbols}&apikey={API_KEY}"
         res = requests.get(url).json()
-        
-        # נירמול מבנה הנתונים
         data_map = res if isinstance(res.get(list(ANALYST_DATA.keys())[0]), dict) else {symbols: res}
         
-        spy_chg = float(data_map.get('SPY', {}).get('percent_change', 0))
-
         if mode == 'alert':
+            spy_chg = float(data_map.get('SPY', {}).get('percent_change', 0))
             alerts = []
             for sym, info in ANALYST_DATA.items():
                 if sym in ['SPY', 'VIX']: continue
@@ -57,9 +59,8 @@ def home():
                         txt += f"🔗 [Chart](https://www.tradingview.com/chart/?symbol={sym.split('/')[0]})"
                         alerts.append(txt)
                 except: continue
-
             if alerts:
-                send_telegram("🔴 *ACTION APPROVED ONLY WITH PERMISSION*\n🚨 *MIZRACHI MARKETS ALERT*\n\n" + "\n\n".join(alerts))
+                send_telegram("🏛 *MIZRACHI MARKETS ALERT*\n\n" + "\n\n".join(alerts))
             return "OK", 200
 
         if is_full_report:
@@ -72,12 +73,12 @@ def home():
                 msg += f"{'🟢' if chg > 0 else '🔴'} *{info[0]}* ({sym})\n💵 `${price:,.2f}` ({chg:.2f}%)\n"
                 if sym == 'ZIM': msg += f"🔍 [News](https://finance.yahoo.com/quote/ZIM/news) | [Sentiment](https://stocktwits.com/symbol/ZIM)\n"
                 msg += "\n"
-            msg += "──────────────────\n🔴 *ACTION APPROVED ONLY WITH PERMISSION*"
+            msg += "──────────────────"
             send_telegram(msg)
             return "Sent", 200
-    except Exception as e: return str(e), 500
-    return "Hunter Active", 200
+            
+    except Exception as e: return f"Error: {str(e)}", 500
+    return "Mizrachi Markets Active", 200
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
-
