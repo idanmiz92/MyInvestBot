@@ -18,7 +18,7 @@ ANALYST_DATA = {
     'BTC/USD': ['Bitcoin', 100000, 'Digital Gold', 4.0]
 }
 
-# נתיב חדש ל-Health Check - ימנע קריסות של Render
+# נתיב Health Check - זה הפתרון שיגרום ל-Render להפסיק לקרוס
 @app.route('/health')
 def health():
     return "OK", 200
@@ -41,6 +41,8 @@ def home():
     try:
         url = f"https://api.twelvedata.com/quote?symbol={symbols}&apikey={API_KEY}"
         res = requests.get(url).json()
+        
+        # נירמול מבנה הנתונים מה-API
         data_map = res if isinstance(res.get(list(ANALYST_DATA.keys())[0]), dict) else {symbols: res}
         
         if mode == 'alert':
