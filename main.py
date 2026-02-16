@@ -11,7 +11,7 @@ CHAT_ID = os.getenv("CHAT_ID")
 # רק צים והגרמנים - ללא רעש רקע כדי לחסוך בקריאות API
 ANALYST_DATA = {
     'ZIM': '🚢 TARGET',
-    'HLAG': '🇩🇪 BUYER'
+    'HLAG:XETR': '🇩🇪 BUYER'
 }
 
 def send_telegram(text):
@@ -51,3 +51,4 @@ def home():
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+
