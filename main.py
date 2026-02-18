@@ -4,51 +4,62 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-API_KEY = "4b1d7ca71ff443118c6e31eb40044671"
-TOKEN = os.getenv("TELEGRAM_TOKEN")
+# --- הגדרות מערכת ---
+POLYGON_API_KEY = os.getenv("POLYGON_API_KEY", "כאן_שמים_את_המפתח_או_בהגדרות_רנדר")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# רק צים והגרמנים - ללא רעש רקע כדי לחסוך בקריאות API
-ANALYST_DATA = {
-    'ZIM': '🚢 TARGET',
-    'HLAG:XETR': '🇩🇪 BUYER'
-}
+# רשימת ה-15 של "מועצת החכמים"
+TARGETS = [
+    'SEDG', 'S', 'KTOS', 'AVAV', 'PSN', 'GD', 'LMT', # הגנה וסולאראדג'
+    'CYBR', 'TENB', 'OKTA', 'CRWD',                  # סייבר
+    'ENPH', 'SHLS', 'NOVA', 'RUN'                    # אנרגיה
+]
 
 def send_telegram(text):
-    if not TOKEN or not CHAT_ID: return
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    if not TELEGRAM_TOKEN or not CHAT_ID: return
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
-    try: requests.post(url, json=payload, timeout=10)
-    except: pass
+    try:
+        requests.post(url, json=payload, timeout=10)
+    except Exception as e:
+        print(f"Telegram Error: {e}")
 
 @app.route('/')
 def home():
-    if not request.args.get('test'):
-        return "Sniper Ready", 200
+    return "Sniper Core Online 🟢", 200
 
+@app.route('/patrol')
+def patrol():
+    """פונקציית סיור שמופעלת פעם ב-10 דקות"""
     tz = pytz.timezone('Asia/Jerusalem')
     now = datetime.now(tz)
     
+    # בדיקת "דופק" יומית ב-11:00 בבוקר
+    if now.hour == 11 and now.minute < 15:
+        send_telegram(f"☀️ *Daily Heartbeat*\nהמערכת סורקת {len(TARGETS)} מניות.\nסטטוס: יציב 🟢")
+
     try:
-        # בקשה ממוקדת לשני הסמלים בלבד
-        url = f"https://api.twelvedata.com/quote?symbol=ZIM,HLAG&apikey={API_KEY}"
-        data = requests.get(url, timeout=10).json()
+        # שליחת בקשה אחת לכל המניות (חוסך קריאות API)
+        symbols = ",".join(TARGETS)
+        url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers={symbols}&apiKey={POLYGON_API_KEY}"
         
-        msg = "🎯 *ZIM MERGER SNIPER*\n"
-        msg += f"⏰ {now.strftime('%H:%M:%S')}\n\n"
-        
-        for sym, label in ANALYST_DATA.items():
-            stock = data.get(sym, {})
-            price = float(stock.get('price') or stock.get('close') or 0)
-            chg = float(stock.get('percent_change') or 0)
-            msg += f"*{sym}* ({label}): `${price:,.2f}` ({chg:+.2f}%)\n"
-        
-        msg += "\n⚠️ *Action:* Watching for HLAG breakout in XETRA."
-        send_telegram(msg)
-        return "Sent", 200
-    except:
-        return "API Busy", 500
+        response = requests.get(url, timeout=15)
+        data = response.json()
+
+        if data.get('status') != 'OK':
+            return f"Polygon Error: {data.get('status')}", 500
+
+        # כאן תבוא לוגיקת ה-Hunter בשלב הבא
+        # בינתיים הבוט רק מוודא שהנתונים מגיעים
+        return f"Patrol Complete at {now.strftime('%H:%M:%S')}", 200
+
+    except Exception as e:
+        # Circuit Breaker: הבוט לא קורס, הוא מדווח וממשיך
+        error_msg = f"⚠️ *Patrol Error:* {str(e)[:100]}"
+        print(error_msg)
+        return "Stable Recovery", 200
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
-
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
