@@ -4,16 +4,16 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# --- הגדרות מערכת מה-Environment Variables ---
-POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
+# --- הגדרות מערכת ---
+# ניקוי רווחים מיותרים מהמפתח אם השתרבבו בטעות
+POLYGON_API_KEY = os.getenv("POLYGON_API_KEY", "").strip()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# רשימת ה-15 של "מועצת החכמים"
 TARGETS = [
-    'SEDG', 'S', 'KTOS', 'AVAV', 'PSN', 'GD', 'LMT', # הגנה וסולאראדג'
-    'CYBR', 'TENB', 'OKTA', 'CRWD',                  # סייבר
-    'ENPH', 'SHLS', 'NOVA', 'RUN'                    # אנרגיה
+    'SEDG', 'S', 'KTOS', 'AVAV', 'PSN', 'GD', 'LMT',
+    'CYBR', 'TENB', 'OKTA', 'CRWD',
+    'ENPH', 'SHLS', 'NOVA', 'RUN'
 ]
 
 def send_telegram(text):
@@ -25,58 +25,55 @@ def send_telegram(text):
 
 @app.route('/')
 def heartbeat():
-    """מופעל ע"י Full Strategic Report ב-11:00 בבוקר"""
-    tz = pytz.timezone('Asia/Jerusalem')
-    now = datetime.now(tz)
-    msg = f"🟢 *Sniper Heartbeat*\n⏰ {now.strftime('%H:%M:%S')}\n✅ System: Online & Stable\n🎯 Tracking: {len(TARGETS)} targets"
-    send_telegram(msg)
-    return "Heartbeat Sent", 200
+    return "Sniper Core Online 🟢", 200
 
 @app.route('/patrol')
 def patrol():
-    """מופעל ע"י Real Time Hunter כל 10 דקות"""
     try:
         symbols = ",".join(TARGETS)
+        # שימוש בכתובת Snapshot מעודכנת
         url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers={symbols}&apiKey={POLYGON_API_KEY}"
         
-        data = requests.get(url, timeout=15).json()
-        if data.get('status') != 'OK': return "API Error", 500
+        response = requests.get(url, timeout=15)
+        data = response.json()
 
-        for ticker in data.get('tickers', []):
+        # אבחון שגיאה מפורט
+        if data.get('status') != 'OK':
+            error_details = data.get('error', data.get('message', 'Unknown Error'))
+            return f"Polygon Detail Error: {error_details}", 400
+
+        found_tickers = data.get('tickers', [])
+        for ticker in found_tickers:
             sym = ticker.get('ticker')
-            prev_close = ticker.get('prevDay', {}).get('c', 0)
+            # שליפת מחיר מעדכון אחרון (Last Trade)
             curr_price = ticker.get('lastTrade', {}).get('p', 0)
+            prev_close = ticker.get('prevDay', {}).get('c', 0)
             
-            if prev_close == 0: continue
-            change_pct = ((curr_price - prev_close) / prev_close) * 100
+            if prev_close > 0:
+                change_pct = ((curr_price - prev_close) / prev_close) * 100
+                if change_pct >= 3.0:
+                    generate_money_shot(sym, curr_price, change_pct)
 
-            # טריגר האצה וזיהוי: 3% עד 5% ומעלה
-            if change_pct >= 3.0:
-                generate_money_shot(sym, curr_price, change_pct)
+        return f"Patrol Success: Scanned {len(found_tickers)} tickers", 200
 
-        return "Patrol Scan Complete", 200
     except Exception as e:
-        return f"Stable Recovery: {str(e)}", 200
+        return f"System Error: {str(e)}", 500
 
 def generate_money_shot(symbol, price, change):
-    """חישוב ושליחת כרטיס עסקה עבור השקעה של 500$"""
     investment = 500
-    shares = int(investment / price)
-    stop_loss = price * 0.90  # 10% סטופ לוס
-    target_profit = price * 1.30 # יעד רווח 30%
+    shares = int(investment / price) if price > 0 else 0
+    if shares == 0: return
     
-    potential_gain = (target_profit - price) * shares
-    potential_loss = (price - stop_loss) * shares
-
+    stop_loss = price * 0.90
+    target_profit = price * 1.30
+    
     msg = f"🎯 *MONEY SHOT DETECTED*\n"
     msg += f"📈 *{symbol}* זינקה ב-{change:.2f}%\n"
-    msg += f"💰 מחיר נוכחי: `${price:.2f}`\n\n"
-    msg += f"--- *תוכנית פעולה ל-$500* ---\n"
-    msg += f"📊 ביצוע: {shares} מניות\n"
-    msg += f"🛡️ סטופ-לוס (10%-): `${stop_loss:.2f}`\n"
-    msg += f"📈 יעד רווח: `${target_profit:.2f}`\n"
-    msg += f"💵 רווח פוטנציאלי: `${potential_gain:.2f}`\n"
-    msg += f"📉 סיכון מקסימלי: `${potential_loss:.2f}`\n\n"
+    msg += f"💰 מחיר: `${price:.2f}`\n\n"
+    msg += f"--- *תוכנית ל-$500* ---\n"
+    msg += f"📊 כמות: {shares} מניות\n"
+    msg += f"🛡️ סטופ (10%-): `${stop_loss:.2f}`\n"
+    msg += f"📈 יעד (30%+): `${target_profit:.2f}`\n"
     msg += f"🔴 *Action approved only with my approval (Y/N)?*"
     
     send_telegram(msg)
