@@ -44,7 +44,7 @@ def patrol():
 
         symbols = ",".join(TARGETS)
         # עדכון הכתובת ל-Massive.com
-        url = f"https://api.massive.com/v2/snapshot/locale/us/markets/stocks/tickers?tickers={symbols}&apiKey={API_KEY}"
+        url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers={symbols}&apiKey={API_KEY}"
         
         response = requests.get(url, timeout=10)
         data = response.json()
@@ -96,3 +96,4 @@ def generate_money_shot(symbol, price, change):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+
