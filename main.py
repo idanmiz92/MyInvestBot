@@ -1,11 +1,11 @@
-import os, requests, pytz
+import os, requests, pytz, time
 from flask import Flask
 from datetime import datetime
 
 app = Flask(__name__)
 
 # --- הגדרות מערכת ---
-# השם נשאר POLYGON_API_KEY ב-Render כדי שלא נצטרך לשנות הגדרות שם
+# השם נשאר POLYGON_API_KEY ב-Render כדי לחסוך שינויי הגדרות, נזין שם את מפתח ה-Finnhub
 API_KEY = os.getenv("POLYGON_API_KEY", "").strip()
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -29,50 +29,49 @@ def send_telegram(text):
 
 @app.route('/')
 def heartbeat():
-    # ב-11:05 זה ישלח לך הודעה שהכל עובד
     now = datetime.now(pytz.timezone('Israel')).strftime("%H:%M")
-    msg = f"🟢 *Mizrachi Sniper Online*\nTime: {now}\nStatus: System is armed and waiting."
+    msg = f"🟢 *Mizrachi Sniper Online*\nTime: {now}\nSource: Finnhub Core\nStatus: System is armed."
     send_telegram(msg)
-    return "Sniper Core Online 🟢", 200
+    return "Sniper Core Online (Finnhub) 🟢", 200
 
 @app.route('/patrol')
 def patrol():
-    print(f"--- Starting Massive Patrol at {datetime.now()} ---")
-    try:
-        if not API_KEY:
-            return "Error: Missing API Key in Render Settings", 400
+    print(f"--- Starting Finnhub Patrol at {datetime.now()} ---")
+    if not API_KEY:
+        return "Error: Missing Finnhub API Key", 400
 
-        symbols = ",".join(TARGETS)
-        # עדכון הכתובת ל-Massive.com
-        url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?tickers={symbols}&apiKey={API_KEY}"
-        
-        response = requests.get(url, timeout=10)
-        data = response.json()
+    scanned_count = 0
+    found_trigger = False
 
-        if data.get('status') != 'OK':
-            error_detail = data.get('error', data.get('message', 'Unknown API Error'))
-            print(f"Massive API Error: {error_detail}")
-            return f"Massive Error: {error_detail}", 400
+    for symbol in TARGETS:
+        try:
+            # Finnhub Quote Endpoint
+            url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={API_KEY}"
+            response = requests.get(url, timeout=7)
+            data = response.json()
 
-        tickers = data.get('tickers', [])
-        found_trigger = False
+            # בדיקה אם הנתונים הגיעו (c = current price, pc = previous close)
+            curr_price = data.get('c', 0)
+            prev_close = data.get('pc', 0)
 
-        for ticker in tickers:
-            sym = ticker.get('ticker')
-            curr_price = ticker.get('lastTrade', {}).get('p', 0)
-            prev_close = ticker.get('prevDay', {}).get('c', 0)
-            
-            if prev_close > 0:
+            if curr_price > 0 and prev_close > 0:
                 change_pct = ((curr_price - prev_close) / prev_close) * 100
+                print(f"Checking {symbol}: {change_pct:.2f}%")
+                
                 if change_pct >= 3.0:
-                    generate_money_shot(sym, curr_price, change_pct)
+                    generate_money_shot(symbol, curr_price, change_pct)
                     found_trigger = True
+                
+                scanned_count += 1
+            
+            # המתנה קצרה כדי לא להעמיס על ה-API
+            time.sleep(0.5)
 
-        return f"Patrol Success: Scanned {len(tickers)} stocks. Trigger: {found_trigger}", 200
+        except Exception as e:
+            print(f"Error scanning {symbol}: {e}")
+            continue
 
-    except Exception as e:
-        print(f"System Crash: {str(e)}")
-        return f"System Error: {str(e)}", 500
+    return f"Patrol Success: Scanned {scanned_count} stocks. Trigger: {found_trigger}", 200
 
 def generate_money_shot(symbol, price, change):
     investment = 500
@@ -83,7 +82,7 @@ def generate_money_shot(symbol, price, change):
     target_profit = price * 1.30
     
     msg = (
-        f"🎯 *MONEY SHOT DETECTED*\n"
+        f"🎯 *MONEY SHOT DETECTED (Finnhub)*\n"
         f"📈 *{symbol}* זינקה ב-{change:.2f}%\n"
         f"💰 מחיר נוכחי: `${price:.2f}`\n\n"
         f"--- *תוכנית פעולה ל-$500* ---\n"
@@ -96,4 +95,3 @@ def generate_money_shot(symbol, price, change):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
-
