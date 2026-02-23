@@ -29,30 +29,16 @@ def get_company_info(symbol):
         return data.get('name', symbol)
     except: return symbol
 
-def get_sentiment(symbol):
-    try:
-        url = f"https://finnhub.io/api/v1/news-sentiment?symbol={symbol}&token={API_KEY}"
-        data = requests.get(url, timeout=7).json()
-        bullish_pct = data.get('sentiment', {}).get('bullishPercent', 0)
-        if bullish_pct > 0.6: return "אופטימי 🔥"
-        elif bullish_pct < 0.4 and bullish_pct > 0: return "זהיר ❄️"
-        return "מאוזן 😐"
-    except: return "ניטרלי"
-
 @app.route('/daily_report')
 def daily_report():
+    """הפונקציה שאחראית על ה-Opening וה-Closing Bell המעוצבים"""
     now_il = datetime.now(pytz.timezone('Israel'))
-    header_type = "☀️ פתיחת מסחר" if now_il.hour < 18 else "🌑 סיכום נעילה"
+    is_opening = now_il.hour < 18
+    header = "Mizrachi Markets - Opening Bell" if is_opening else "Mizrachi Markets - Closing Bell"
+    price_label = "מחיר פתיחה" if is_opening else "מחיר נעילה"
+    icon_main = "☀️" if is_opening else "🌑"
     
-    report = [
-        f"🏦 *Mizrachi Markets | {header_type}*",
-        f"📅 {now_il.strftime('%d/%m/%Y | %H:%M')}\n",
-        "---",
-        "🌟 *המניות הבולטות כרגע:*",
-    ]
-    
-    stars = []
-    others = []
+    report = [f"{icon_main} *{header}*\n📅 {now_il.strftime('%d/%m/%Y | %H:%M')}\n", "---"]
     
     for symbol in TARGETS:
         try:
@@ -61,21 +47,25 @@ def daily_report():
             pc = data.get('pc', 1)
             change = ((price - pc) / pc) * 100
             name = get_company_info(symbol)
+            target = price * 1.30
             
-            line = f"• *{name}* ({symbol}): `${price:.2f}` ({change:+.2f}%)"
+            icon = "🚀" if change > 3 else "📈" if change > 0 else "📉"
             
-            if change >= 2.0: stars.append("🚀 " + line)
-            elif change <= -2.0: stars.append("⚠️ " + line)
-            else: others.append(line)
+            stock_block = (
+                f"{icon} *{name}* ({symbol})\n"
+                f"💰 {price_label}: `${price:.2f}`\n"
+                f"📊 שינוי יומי: `{change:+.2f}%`"
+            )
+            stock_block += f"\n🎯 מחיר יעד: `${target:.2f}`\n"
+            
+            report.append(stock_block + "---")
             time.sleep(0.3)
         except: continue
     
-    # חיבור הדו"ח
-    full_report = report + stars + ["\n📊 *שאר המניות במעקב:*"] + others + ["\n---", "_פעל באחריות ובשיקול דעת._"]
-    send_telegram("\n".join(full_report))
+    report.append("_Stay Sharp. Mizrachi Markets._")
+    send_telegram("\n".join(report))
     return "OK", 200
 
-# --- שאר הפונקציות (Patrol, News Radar) נשארות כפי שהיו בגרסה הקודמת ---
 @app.route('/patrol')
 def patrol():
     for symbol in TARGETS:
@@ -87,7 +77,15 @@ def patrol():
                 change = ((curr_p - prev_p) / prev_p) * 100
                 if change >= 3.0 and LAST_SENT_PRICES.get(symbol) != curr_p:
                     name = get_company_info(symbol)
-                    msg = f"🎯 *MONEY SHOT: {name}*\n🚀 זינוק של {change:.2f}%\n💰 מחיר: `${curr_p:.2f}`\n\n🛡️ סטופ: `${curr_p*0.9:.2f}`\n📈 יעד: `${curr_p*1.3:.2f}`"
+                    msg = (
+                        f"🎯 *Mizrachi Markets Sniper Alert!*\n"
+                        f"🏢 *{name}* ({symbol})\n"
+                        f"---"
+                        f"\n💰 *מחיר:* `${curr_p:.2f}`"
+                        f"\n🚀 *זינוק:* `+{change:.2f}%`"
+                        f"\n🎯 *יעד:* `${curr_p * 1.30:.2f}`"
+                        f"\n🛡️ *סטופ:* `${curr_p * 0.90:.2f}`\n---"
+                    )
                     send_telegram(msg)
                     LAST_SENT_PRICES[symbol] = curr_p
             time.sleep(0.4)
@@ -108,7 +106,7 @@ def news_radar():
     except: return "Error", 500
 
 @app.route('/')
-def heartbeat(): return "Mizrachi Maestro Online", 200
+def heartbeat(): return "Mizrachi Maestro Online 🟢", 200
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
