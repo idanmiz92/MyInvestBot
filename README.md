@@ -1,52 +1,48 @@
 # 🎯 Mizrachi Markets
-### The Sniper Financial Intelligence Suite
+### High-Signal Financial Intelligence Suite
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
 ![Deployment](https://img.shields.io/badge/Deployment-Render-46E3B7.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Status](https://img.shields.io/badge/Status-Live-success.svg)
 
 ---
 
 ## 📖 Overview
-**Mizrachi Markets** is a high-signal financial intelligence system. It bridges the gap between raw market noise and actionable insights by delivering precision-filtered data directly to Telegram.
+**Mizrachi Markets** is a high-fidelity financial intelligence system designed to bridge the gap between raw market noise and actionable insights. Built for traders who value precision, the system filters global news and price action to deliver only the most critical market catalysts directly to Telegram.
 
 ---
 
-## 📸 System in Action
-| Opening Bell Report | Real-Time Sniper Alert |
-| :---: | :---: |
-| ![Opening Bell](https://your-image-link-here.png) | ![Sniper Alert](https://your-image-link-here.png) |
-*(כאן תעלה את התמונות ששלחת לי כדי שאנשים יראו את היופי מיד)*
+## 🚀 Core Intelligence Features
 
----
+### 🦈 Shark Tracker (Entity Intelligence)
+Automated detection of potential acquirers. The system scans financial headlines for keywords like **Takeover, Merger, or Acquisition** and maps them against a database of institutional "Sharks" (e.g., JPM, AAPL, MSFT) to identify the buyer behind the move in real-time.
 
-## 🚀 Key Intelligence Features
-
-### 🦈 Shark Tracker
-Automated entity detection. Scans headlines for keywords like **Takeover** or **Partnership** and identifies the "Shark" (e.g., JPM, AAPL) behind the move.
-
-### 📉 Anti-Fatigue Logic
-Engineered for clarity. The system suppresses redundant alerts, triggering only on significant moves (**5%+**) and further breakthroughs (**+2%**).
+### 📉 Anti-Fatigue Alert Logic
+Engineered to solve "Alert Burnout." Unlike standard bots, Mizrachi Markets employs a custom **Breakthrough Algorithm**:
+* **Entry Threshold:** Alerts trigger only on significant price moves (>5%).
+* **Noise Suppression:** Subsequent fluctuations are muted unless a further **2% breakthrough** is achieved from the last alert.
 
 ### 🛰️ All-In Radar
-A dedicated engine for market catalysts:
-* **Strategic Partnerships** 🤝
-* **M&A Rumors** 📢
-* **Institutional Sentiment** 🏛️
+A dedicated scanning engine for high-impact catalysts:
+* **Strategic Partnerships:** Detecting game-changing collaborations.
+* **M&A Rumors:** Capturing early-stage whispers.
+* **Nerve Calmers:** Identifying news that stabilizes volatile sectors.
 
 ---
 
-## 🛠 Tech Stack
-* **Engine:** Python 3.10+
-* **Server:** Flask (Webhook Ready)
-* **Data APIs:** Finnhub, Polygon
-* **Infrastructure:** Render, Cron-job.org
+## 🖥️ Sample Output
+
+The system delivers structured, clean, and professional reports:
+
+```text
+🎯 Mizrachi Markets Sniper Alert!
+🏢 SolarEdge Technologies Inc (SEDG)
+---
+💰 Price: $42.78
+🚀 Surge: +8.63%
+🎯 Target: $55.61
+🛡️ Stop: $38.50
 
 ---
-
-## ⚖️ Compliance & Legal
-Built for professional use. Every report includes an environment-driven **Legal Disclaimer** to ensure transparency and regulatory alignment.
-
----
-
-_Stay Sharp. Mizrachi Markets._
+⚠️ Disclaimer: Algorithmic data processing for informational purposes only.
