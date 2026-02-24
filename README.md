@@ -1,44 +1,52 @@
-Mizrachi Markets - Sniper Financial Intelligence Suite 🎯
-Mizrachi Markets is a high-signal financial intelligence system designed to bridge the gap between market noise and actionable insights. Unlike standard bots that flood users with raw data, this suite employs custom logic to filter, analyze, and deliver only the most critical market catalysts directly to Telegram.
+# 🎯 Mizrachi Markets
+### The Sniper Financial Intelligence Suite
 
-✨ Intelligence-Driven Features
-🦈 Shark Tracker (Acquisition Intelligence)
-Automated entity detection within high-velocity financial news. The system scans headlines for keywords like Takeover, Merger, or Acquisition and cross-references them against a pre-defined database of "Cash-Rich Sharks" (e.g., JPM, AAPL, MSFT) to identify potential buyers in real-time.
+![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
+![Deployment](https://img.shields.io/badge/Deployment-Render-46E3B7.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-📉 Anti-Fatigue Alert Logic
-Engineered to prevent "Alert Burnout." The Sniper Alert system only triggers on significant price movements (5%+) and suppresses subsequent notifications for the same asset unless a further 2% breakthrough is achieved. This ensures every notification is a high-priority event.
+---
 
-🛰️ All-In Radar
-A dedicated scanning engine focused on high-impact catalysts:
+## 📖 Overview
+**Mizrachi Markets** is a high-signal financial intelligence system. It bridges the gap between raw market noise and actionable insights by delivering precision-filtered data directly to Telegram.
 
-Strategic Partnerships: Detecting game-changing collaborations (e.g., AI integrations).
+---
 
-M&A Rumors: Capturing early-stage takeover whispers before they hit the mainstream.
+## 📸 System in Action
+| Opening Bell Report | Real-Time Sniper Alert |
+| :---: | :---: |
+| ![Opening Bell](https://your-image-link-here.png) | ![Sniper Alert](https://your-image-link-here.png) |
+*(כאן תעלה את התמונות ששלחת לי כדי שאנשים יראו את היופי מיד)*
 
-Nerve Calmers: Identifying news that stabilizes volatile sectors.
+---
 
-☀️ Maestro Daily Reports
-UX-optimized summaries delivered during Opening Bell and Closing Bell. Each report features:
+## 🚀 Key Intelligence Features
 
-Entity Clarity: Full corporate names instead of just tickers.
+### 🦈 Shark Tracker
+Automated entity detection. Scans headlines for keywords like **Takeover** or **Partnership** and identifies the "Shark" (e.g., JPM, AAPL) behind the move.
 
-The Golden Trio: Real-time Price, Daily % Change, and Calculated Price Targets.
+### 📉 Anti-Fatigue Logic
+Engineered for clarity. The system suppresses redundant alerts, triggering only on significant moves (**5%+**) and further breakthroughs (**+2%**).
 
-Visual Trend Indicators: Instant recognition of market direction via curated iconography.
+### 🛰️ All-In Radar
+A dedicated engine for market catalysts:
+* **Strategic Partnerships** 🤝
+* **M&A Rumors** 📢
+* **Institutional Sentiment** 🏛️
 
-🛠 Tech Stack & Architecture
-Core: Python 3.10+
+---
 
-Web Framework: Flask (Asynchronous Webhook Handling)
+## 🛠 Tech Stack
+* **Engine:** Python 3.10+
+* **Server:** Flask (Webhook Ready)
+* **Data APIs:** Finnhub, Polygon
+* **Infrastructure:** Render, Cron-job.org
 
-Intelligence APIs: Finnhub Stock API, Telegram Bot API
+---
 
-Infrastructure: Render (Cloud Hosting), Cron-job.org (Scheduled Tasks)
+## ⚖️ Compliance & Legal
+Built for professional use. Every report includes an environment-driven **Legal Disclaimer** to ensure transparency and regulatory alignment.
 
-Security: Comprehensive Environment Variable isolation for sensitive API keys and IDs.
+---
 
-⚖️ Built-in Compliance
-Mizrachi Markets is designed with professional distribution in mind. Every automated report includes an environment-driven Legal Disclaimer, ensuring clear distinction between algorithmic data processing and financial advice.
-
-🧠 Development Philosophy
-This project was born out of a need for clarity. In an era of information overload, the goal was to build a "Digital Filter"—a system that respects the user's attention while ensuring they never miss a critical market shift.
+_Stay Sharp. Mizrachi Markets._
