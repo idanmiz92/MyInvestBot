@@ -5,6 +5,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 # --- הגדרות מערכת ---
+# וודא שכל ה-Variables האלו מוגדרים ב-Render
 API_KEY = os.getenv("POLYGON_API_KEY", "").strip() 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
@@ -12,8 +13,16 @@ CHAT_ID = os.getenv("CHAT_ID")
 TARGETS = ['SEDG', 'S', 'KTOS', 'AVAV', 'PSN', 'GD', 'LMT', 'CYBR', 'TENB', 'OKTA', 'CRWD', 'ENPH', 'SHLS', 'NOVA', 'RUN']
 HOT_KEYWORDS = ['merger', 'acquisition', 'buyout', 'takeover', 'partnership', 'strategic investment']
 
-LAST_SENT_PRICES = {}
+# ניהול מצב הבוט בזכרון
+LAST_SENT_CHANGE = {}
 LAST_SENT_NEWS = []
+
+# שורת הגנה משפטית - הדיסקליימר שלך
+LEGAL_DISCLAIMER = (
+    "\n\n---"
+    "\n⚠️ *הבהרה:* המידע מופק אוטומטית על ידי אלגוריתם המנתח מקורות פומביים בלבד. "
+    "אין לראות במידע זה ייעוץ השקעות או מידע פנים. כל פעולה היא על אחריות המשתמש."
+)
 
 def send_telegram(text):
     if not TELEGRAM_TOKEN or not CHAT_ID: return
@@ -31,7 +40,7 @@ def get_company_info(symbol):
 
 @app.route('/daily_report')
 def daily_report():
-    """הפונקציה שאחראית על ה-Opening וה-Closing Bell המעוצבים"""
+    """דיווח פתיחה וסגירה מעוצב"""
     now_il = datetime.now(pytz.timezone('Israel'))
     is_opening = now_il.hour < 18
     header = "Mizrachi Markets - Opening Bell" if is_opening else "Mizrachi Markets - Closing Bell"
@@ -55,58 +64,74 @@ def daily_report():
                 f"{icon} *{name}* ({symbol})\n"
                 f"💰 {price_label}: `${price:.2f}`\n"
                 f"📊 שינוי יומי: `{change:+.2f}%`"
+                f"\n🎯 מחיר יעד: `${target:.2f}`\n"
             )
-            stock_block += f"\n🎯 מחיר יעד: `${target:.2f}`\n"
-            
             report.append(stock_block + "---")
             time.sleep(0.3)
         except: continue
     
     report.append("_Stay Sharp. Mizrachi Markets._")
+    report.append(LEGAL_DISCLAIMER)
     send_telegram("\n".join(report))
     return "OK", 200
 
 @app.route('/patrol')
 def patrol():
+    """צייד הזינוקים - עכשיו עם לוגיקה שקטה וחכמה"""
     for symbol in TARGETS:
         try:
             data = requests.get(f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={API_KEY}").json()
             curr_p = data.get('c', 0)
             prev_p = data.get('pc', 0)
+            
             if curr_p > 0 and prev_p > 0:
                 change = ((curr_p - prev_p) / prev_p) * 100
-                if change >= 3.0 and LAST_SENT_PRICES.get(symbol) != curr_p:
-                    name = get_company_info(symbol)
-                    msg = (
-                        f"🎯 *Mizrachi Markets Sniper Alert!*\n"
-                        f"🏢 *{name}* ({symbol})\n"
-                        f"---"
-                        f"\n💰 *מחיר:* `${curr_p:.2f}`"
-                        f"\n🚀 *זינוק:* `+{change:.2f}%`"
-                        f"\n🎯 *יעד:* `${curr_p * 1.30:.2f}`"
-                        f"\n🛡️ *סטופ:* `${curr_p * 0.90:.2f}`\n---"
-                    )
-                    send_telegram(msg)
-                    LAST_SENT_PRICES[symbol] = curr_p
+                
+                # תנאי סף: 5% זינוק ודילוג של 2% בין התראות
+                if change >= 5.0:
+                    last_change = LAST_SENT_CHANGE.get(symbol, 0)
+                    
+                    if abs(change - last_change) >= 2.0:
+                        name = get_company_info(symbol)
+                        msg = (
+                            f"🎯 *Mizrachi Markets Sniper Alert!*\n"
+                            f"🏢 *{name}* ({symbol})\n"
+                            f"---"
+                            f"\n💰 *מחיר:* `${curr_p:.2f}`"
+                            f"\n🚀 *זינוק:* `+{change:.2f}%`"
+                            f"\n🎯 *יעד:* `${curr_p * 1.30:.2f}`"
+                            f"\n🛡️ *סטופ:* `${curr_p * 0.90:.2f}`"
+                            f"{LEGAL_DISCLAIMER}"
+                        )
+                        send_telegram(msg)
+                        LAST_SENT_CHANGE[symbol] = change
             time.sleep(0.4)
         except: continue
     return "OK", 200
 
 @app.route('/news_radar')
 def news_radar():
+    """רדאר חדשות חמות - רכישות, מיזוגים ושותפויות"""
     try:
         news = requests.get(f"https://finnhub.io/api/v1/news?category=general&token={API_KEY}").json()
         for item in news[:15]:
             headline = item.get('headline', '')
             if any(word in headline.lower() for word in HOT_KEYWORDS) and headline not in LAST_SENT_NEWS:
-                send_telegram(f"🚨 *ALL-IN RADAR*\n\n📢 {headline}\n\n🔗 [לכתבה המלאה]({item.get('url')})")
+                msg = (
+                    f"🚨 *ALL-IN RADAR*\n\n"
+                    f"📢 {headline}\n\n"
+                    f"🔗 [לכתבה המלאה]({item.get('url')})"
+                    f"{LEGAL_DISCLAIMER}"
+                )
+                send_telegram(msg)
                 LAST_SENT_NEWS.append(headline)
                 if len(LAST_SENT_NEWS) > 50: LAST_SENT_NEWS.pop(0)
         return "OK", 200
     except: return "Error", 500
 
 @app.route('/')
-def heartbeat(): return "Mizrachi Maestro Online 🟢", 200
+def heartbeat(): 
+    return "Mizrachi Maestro Online 🟢", 200
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
