@@ -63,7 +63,7 @@ def daily_report():
             
             icon = "🚀" if change > 3 else "📈" if change > 0 else "📉"
             report.append(f"{icon} *{name}* ({symbol})\n💰 {price_label}: `${price:.2f}`\n📊 שינוי: `{change:+.2f}%`\n🎯 יעד: `${target:.2f}`\n---")
-            time.sleep(0.3)
+            time.sleep(1.0) # <--- עודכן ל-1.0
         except: continue
     
     report.append("_Stay Sharp. Mizrachi Markets._" + get_disclaimer())
@@ -94,7 +94,7 @@ def patrol():
                         )
                         send_telegram(msg)
                         LAST_SENT_CHANGE[symbol] = change
-            time.sleep(0.4)
+            time.sleep(1.0) # <--- עודכן ל-1.0
         except: continue
     return "OK", 200
 
