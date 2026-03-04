@@ -47,28 +47,44 @@ def home():
 
 @app.route('/daily_report')
 def daily_report():
-    """הדו"ח של 16:30 (Opening Bell)"""
-    # שלב 1: שליפת המניות העדכניות מה-Database
-    current_symbols = get_all_active_symbols()
-    
-    if not current_symbols:
-        return "No symbols found in Database", 200
+    """הדו"ח של 16:30 - שולח לכל משתמש באופן אישי"""
+    try:
+        # 1. שליפת כל הנתונים מהטבלה (מניות + מזהה צ'אט)
+        response = supabase.table('user_preferences').select('chat_id, symbol').execute()
+        data = response.data
 
-    report_lines = [f"🔔 *Mizrachi Markets - Opening Bell*"]
-    
-    # שלב 2: לופ שרץ על המניות שנמצאו ב-Database
-    for symbol in current_symbols:
-        # כאן תבוא הקריאה לפונקציית הנתונים שלך (למשל ה-get_stock_data)
-        # וצירור הנתונים לדו"ח כפי שעשית עד עכשיו.
-        report_lines.append(f"--- {symbol}: [נתונים מה-API שלך]")
-        time.sleep(1) # הגנה מפני חסימה
-    
-    report_lines.append("\n---Stay Sharp. Mizrachi Markets.---")
-    full_report = "\n".join(report_lines)
-    
-    # שלב 3: שליחה לטלגרם
-    send_telegram_message(TELEGRAM_CHAT_ID, full_report)
-    return "Daily report sent successfully!", 200
+        if not data:
+            return "No data found in DB", 200
+
+        # 2. סידור המניות לפי משתמשים (Grouping)
+        user_reports = {}
+        for entry in data:
+            cid = entry['chat_id']
+            sym = entry['symbol'].strip().upper()
+            if cid not in user_reports:
+                user_reports[cid] = []
+            user_reports[cid].append(sym)
+
+        # 3. שליחת דו"ח נפרד לכל chat_id שנמצא בטבלה
+        for cid, symbols in user_reports.items():
+            report_lines = [f"🔔 *Mizrachi Markets - Opening Bell*"]
+            
+            for symbol in symbols:
+                # כאן תבוא הקריאה לנתונים שלך (למשל get_stock_data)
+                report_lines.append(f"--- {symbol}: [נתונים מה-API שלך]")
+                time.sleep(1)
+            
+            report_lines.append("\n---Stay Sharp. Mizrachi Markets.---")
+            full_report = "\n".join(report_lines)
+            
+            # שליחה ל-ID הספציפי מה-Database!
+            send_telegram_message(cid, full_report)
+
+        return "All individual reports sent!", 200
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return f"Error: {e}", 500
 
 @app.route('/patrol')
 def patrol():
@@ -79,3 +95,4 @@ def patrol():
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+
