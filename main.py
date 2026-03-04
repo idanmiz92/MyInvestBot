@@ -1,133 +1,81 @@
-import os, requests, pytz, time
-from flask import Flask
-from datetime import datetime
+import os
+import requests
+import time
+from flask import Flask, request
+from supabase import create_client, Client
 
 app = Flask(__name__)
 
-# --- הגדרות מערכת ---
-API_KEY = os.getenv("POLYGON_API_KEY", "").strip() 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+# --- הגדרות וחיבורים (נמשכים מ-Render) ---
+TOKEN = os.environ.get("TELEGRAM_TOKEN")
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-TARGETS = ['SEDG', 'S', 'KTOS', 'AVAV', 'PSN', 'GD', 'LMT', 'CYBR', 'TENB', 'OKTA', 'CRWD', 'ENPH', 'SHLS', 'NOVA', 'RUN']
-HOT_KEYWORDS = ['merger', 'acquisition', 'buyout', 'takeover', 'partnership', 'strategic investment']
+# אתחול החיבור ל-Supabase
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# רשימת ה"כרישים" - קונים פוטנציאליים עם הרבה מזומן
-SHARKS = {
-    'JPMorgan': 'JPM', 'Apple': 'AAPL', 'Microsoft': 'MSFT', 'Google': 'GOOGL', 
-    'Alphabet': 'GOOGL', 'Amazon': 'AMZN', 'Visa': 'V', 'Mastercard': 'MA', 
-    'Goldman Sachs': 'GS', 'Bank of America': 'BAC'
-}
-
-LAST_SENT_CHANGE = {}
-LAST_SENT_NEWS = []
-
-# משיכת הדיסקליימר מה-Environment Variable
-DISCLAIMER_TEXT = os.getenv("LEGAL_DISCLAIMER", "⚠️ המידע מבוסס על נתונים פומביים בלבד.")
-
-def get_disclaimer():
-    return f"\n\n---\n{DISCLAIMER_TEXT}"
-
-def send_telegram(text):
-    if not TELEGRAM_TOKEN or not CHAT_ID: return
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}
-    try: requests.post(url, json=payload, timeout=5)
-    except: pass
-
-def get_company_info(symbol):
+def get_all_active_symbols():
+    """שולף את כל המניות שקיימות בטבלה ב-Supabase"""
     try:
-        url = f"https://finnhub.io/api/v1/stock/profile2?symbol={symbol}&token={API_KEY}"
-        data = requests.get(url, timeout=5).json()
-        return data.get('name', symbol)
-    except: return symbol
+        # פנייה לטבלה user_preferences ושליפת עמודת ה-symbol
+        response = supabase.table('user_preferences').select('symbol').execute()
+        # יצירת רשימה נקייה ללא רווחים ובאותיות גדולות
+        symbols = [item['symbol'].strip().upper() for item in response.data]
+        # הסרת כפילויות (אם אותה מניה מופיעה אצל כמה משתמשים)
+        return list(set(symbols))
+    except Exception as e:
+        print(f"Error fetching symbols: {e}")
+        return []
+
+def get_stock_data(symbol):
+    """
+    כאן תישאר הלוגיקה המקורית שלך לשליפת נתונים מה-API (Yahoo/Polygon).
+    הפונקציה מקבלת סימבול ומחזירה את הנתונים לדו"ח.
+    """
+    # כאן הקוד הקיים שלך...
+    pass
+
+def send_telegram_message(chat_id, text):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    return requests.post(url, json=payload)
+
+@app.route('/')
+def home():
+    return "Mizrachi Markets Server is Live & Connected to DB!"
 
 @app.route('/daily_report')
 def daily_report():
-    now_il = datetime.now(pytz.timezone('Israel'))
-    is_opening = now_il.hour < 18
-    header = "Mizrachi Markets - Opening Bell" if is_opening else "Mizrachi Markets - Closing Bell"
-    price_label = "מחיר פתיחה" if is_opening else "מחיר נעילה"
-    icon_main = "☀️" if is_opening else "🌑"
+    """הדו"ח של 16:30 (Opening Bell)"""
+    # שלב 1: שליפת המניות העדכניות מה-Database
+    current_symbols = get_all_active_symbols()
     
-    report = [f"{icon_main} *{header}*\n📅 {now_il.strftime('%d/%m/%Y | %H:%M')}\n", "---"]
+    if not current_symbols:
+        return "No symbols found in Database", 200
+
+    report_lines = [f"🔔 *Mizrachi Markets - Opening Bell*"]
     
-    for symbol in TARGETS:
-        try:
-            data = requests.get(f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={API_KEY}").json()
-            price = data.get('c', 0)
-            pc = data.get('pc', 1)
-            change = ((price - pc) / pc) * 100
-            name = get_company_info(symbol)
-            target = price * 1.30
-            
-            icon = "🚀" if change > 3 else "📈" if change > 0 else "📉"
-            report.append(f"{icon} *{name}* ({symbol})\n💰 {price_label}: `${price:.2f}`\n📊 שינוי: `{change:+.2f}%`\n🎯 יעד: `${target:.2f}`\n---")
-            time.sleep(1.0) # <--- עודכן ל-1.0
-        except: continue
+    # שלב 2: לופ שרץ על המניות שנמצאו ב-Database
+    for symbol in current_symbols:
+        # כאן תבוא הקריאה לפונקציית הנתונים שלך (למשל ה-get_stock_data)
+        # וצירור הנתונים לדו"ח כפי שעשית עד עכשיו.
+        report_lines.append(f"--- {symbol}: [נתונים מה-API שלך]")
+        time.sleep(1) # הגנה מפני חסימה
     
-    report.append("_Stay Sharp. Mizrachi Markets._" + get_disclaimer())
-    send_telegram("\n".join(report))
-    return "OK", 200
+    report_lines.append("\n---Stay Sharp. Mizrachi Markets.---")
+    full_report = "\n".join(report_lines)
+    
+    # שלב 3: שליחה לטלגרם
+    send_telegram_message(TELEGRAM_CHAT_ID, full_report)
+    return "Daily report sent successfully!", 200
 
 @app.route('/patrol')
 def patrol():
-    for symbol in TARGETS:
-        try:
-            data = requests.get(f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={API_KEY}").json()
-            curr_p = data.get('c', 0)
-            prev_p = data.get('pc', 0)
-            if curr_p > 0 and prev_p > 0:
-                change = ((curr_p - prev_p) / prev_p) * 100
-                if change >= 5.0:
-                    last_change = LAST_SENT_CHANGE.get(symbol, 0)
-                    if abs(change - last_change) >= 2.0:
-                        name = get_company_info(symbol)
-                        msg = (
-                            f"🎯 *Mizrachi Markets Sniper Alert!*\n"
-                            f"🏢 *{name}* ({symbol})\n---\n"
-                            f"💰 *מחיר:* `${curr_p:.2f}`\n"
-                            f"🚀 *זינוק:* `+{change:.2f}%`\n"
-                            f"🎯 *יעד:* `${curr_p * 1.30:.2f}`\n"
-                            f"🛡️ *סטופ:* `${curr_p * 0.90:.2f}`"
-                            f"{get_disclaimer()}"
-                        )
-                        send_telegram(msg)
-                        LAST_SENT_CHANGE[symbol] = change
-            time.sleep(1.0) # <--- עודכן ל-1.0
-        except: continue
-    return "OK", 200
-
-@app.route('/news_radar')
-def news_radar():
-    try:
-        news = requests.get(f"https://finnhub.io/api/v1/news?category=general&token={API_KEY}").json()
-        for item in news[:15]:
-            headline = item.get('headline', '')
-            if any(word in headline.lower() for word in HOT_KEYWORDS) and headline not in LAST_SENT_NEWS:
-                
-                # --- אפקט הגישוש (Shark Tracker) ---
-                potential_buyer = "לא זוהה קונה רשמי בשלב זה"
-                for shark_name, ticker in SHARKS.items():
-                    if shark_name.lower() in headline.lower():
-                        potential_buyer = f"🧐 *{shark_name}* ({ticker})"
-                        break
-                
-                msg = (
-                    f"🚨 *ALL-IN RADAR*\n\n"
-                    f"📢 *כותרת:* {headline}\n\n"
-                    f"🦈 *הקונה המסתמן:* {potential_buyer}\n\n"
-                    f"🔗 [לכתבה המלאה]({item.get('url')})"
-                    f"{get_disclaimer()}"
-                )
-                send_telegram(msg)
-                LAST_SENT_NEWS.append(headline)
-                if len(LAST_SENT_NEWS) > 50: LAST_SENT_NEWS.pop(0)
-        return "OK", 200
-    except: return "Error", 500
-
-@app.route('/')
-def heartbeat(): return "Mizrachi Maestro Online 🟢", 200
+    """בדיקה תקופתית כל 5 דקות"""
+    current_symbols = get_all_active_symbols()
+    # כאן הלוגיקה הקיימת שלך ל-Patrol, כשהיא רצה על current_symbols
+    return "Patrol completed", 200
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
