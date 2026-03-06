@@ -16,21 +16,27 @@ TD_KEY = os.environ.get("TWELVE_DATA_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def get_stock_data(symbol):
-    """שולף נתוני אמת מ-Twelve Data"""
+    """שולף נתוני אמת - תומך במחיר שוק ומחיר סגירה"""
     try:
         url = f"https://api.twelvedata.com/quote?symbol={symbol}&apikey={TD_KEY}"
-        response = requests.get(url).json()
+        r = requests.get(url).json()
         
-        if "price" in response:
-            price = float(response['price'])
-            change = float(response['percent_change'])
+        # מחפש את המחיר בשני השדות האפשריים (price או close)
+        price_raw = r.get('price') or r.get('close')
+        change_raw = r.get('percent_change')
+        
+        if price_raw and change_raw:
+            price = float(price_raw)
+            change = float(change_raw)
             icon = "🟢" if change >= 0 else "🔴"
             return f"{symbol}: ${price:,.2f} ({icon} {change:+.2f}%)"
-        else:
-            return f"{symbol}: נתונים לא זמינים (API limit?)"
+        
+        # אם הגענו לכאן, ה-API החזיר תשובה אבל בלי מחיר
+        error_msg = r.get('message', 'נתונים לא זמינים')
+        return f"{symbol}: {error_msg}"
+        
     except Exception as e:
-        print(f"Error fetching {symbol}: {e}")
-        return f"{symbol}: שגיאה"
+        return f"{symbol}: שגיאה בחיבור"
 
 def send_telegram_message(chat_id, text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -86,4 +92,5 @@ def news_radar():
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+
 
