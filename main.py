@@ -17,9 +17,7 @@ def is_market_open():
     ny_tz = pytz.timezone('America/New_York')
     now_ny = datetime.datetime.now(ny_tz)
     if now_ny.weekday() >= 5: return False
-    market_open = now_ny.replace(hour=9, minute=30, second=0)
-    market_close = now_ny.replace(hour=16, minute=0, second=0)
-    return market_open <= now_ny <= market_close
+    return True
 
 def fetch_stock(symbol):
     try:
@@ -35,9 +33,9 @@ def fetch_stock(symbol):
 
 def send_tg(chat_id, text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    requests.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
+    requests.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown", "disable_web_page_preview": True})
 
-# --- 1. הדו"ח היומי (Opening/Closing) ---
+# --- 1. הדו"ח היומי (עם הדיסקליימר המלא) ---
 def run_daily_report(rtype, cdate):
     data = supabase.table('user_preferences').select('*').execute().data
     users = {}
@@ -51,7 +49,7 @@ def run_daily_report(rtype, cdate):
                 icon = "🟢" if d['c'] >= 0 else "🔴"
                 msg += f"---\n📈 *{d['n']} ({s})*\n💰 מחיר: `${d['p']:,.2f}`\n📊 שינוי: {icon} {d['c']:+.2f}%\n🎯 יעד: `${d['p']*1.3:,.2f}`\n\n"
             time.sleep(8)
-        msg += "---\nStay Sharp. Mizrachi Markets.\n⚠️ *הבהרה:* המידע מופק אוטומטית על ידי אלגוריתם המנתח מקורות פומביים בלבד. אין לראות במידע זה ייעוץ השקעות. כל פעולה היא על אחריות המשתמש."
+        msg += "---\n*Stay Sharp. Mizrachi Markets.*\n\n⚠️ *הבהרה:* המידע מופק אוטומטית על ידי אלגוריתם המנתח מקורות פומביים בלבד. אין לראות במידע זה ייעוץ השקעות. כל פעולה היא על אחריות המשתמש."
         send_tg(cid, msg)
 
 # --- 2. הצייד החכם (Sniper Alert) ---
@@ -60,13 +58,16 @@ def run_sniper():
     data = supabase.table('user_preferences').select('*').execute().data
     for e in data:
         d = fetch_stock(e['symbol'])
-        if d and abs(d['c']) >= 5:
-            last_p = e.get('last_alert_percent', 0)
-            if abs(d['c'] - last_p) >= 7:
-                icon = "🚀" if d['c'] > 0 else "📉"
-                msg = f"{icon} *SNIPER ALERT: {e['symbol']}*\n\nהמניה זזה ב-{d['c']:.2f}%!\nמחיר נוכחי: `${d['p']}`\n\nStay Sharp."
+        if d:
+            curr_c = d['c']
+            last_p = e.get('last_alert_percent') or 0
+            # התראה ראשונה ב-5%, התראה שנייה רק אם זז ב-7% נוספים
+            if (abs(curr_c) >= 5 and last_p == 0) or (abs(curr_c - last_p) >= 7):
+                icon = "🚀" if curr_c > 0 else "📉"
+                direction = "זינוק" if curr_c > 0 else "צניחה"
+                msg = f"{icon} *SNIPER ALERT: {d['n']} ({e['symbol']})*\n\nזוהתה {direction} של {curr_c:.2f}%!\n💰 מחיר נוכחי: `${d['p']}`\n\nStay Sharp. Mizrachi Markets."
                 send_tg(e['chat_id'], msg)
-                supabase.table('user_preferences').update({'last_alert_percent': d['c']}).eq('id', e['id']).execute()
+                supabase.table('user_preferences').update({'last_alert_percent': curr_c}).eq('id', e['id']).execute()
         time.sleep(2)
 
 # --- 3. הראדאר (News Radar) ---
@@ -77,8 +78,11 @@ def run_radar():
         msg = "📡 *Mizrachi Markets - All-In News Radar*\n\n"
         for n in news:
             msg += f"🔹 *{n['headline']}*\n[קרא עוד]({n['url']})\n\n"
+        msg += "---\nStay Sharp. Mizrachi Markets."
         
-        cids = set([e['chat_id'] for e in supabase.table('user_preferences').select('chat_id').execute().data])
+        # שליחה לכל המשתמשים הרשומים
+        data = supabase.table('user_preferences').select('chat_id').execute().data
+        cids = set([e['chat_id'] for e in data])
         for cid in cids: send_tg(cid, msg)
     except: pass
 
