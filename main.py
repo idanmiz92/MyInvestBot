@@ -32,83 +32,77 @@ def send_tg(chat_id, text, preview=False):
 
 # --- מנגנון מניעת כפילויות ---
 def is_news_new(news_id):
-    # בודק אם ה-ID כבר קיים בטבלה
-    exists = supabase.table('processed_news').select('id').eq('news_id', str(news_id)).execute()
-    if not exists.data:
-        # אם לא קיים, מכניס אותו עכשיו
-        supabase.table('processed_news').insert({'news_id': str(news_id)}).execute()
-        return True
-    return False
+    try:
+        exists = supabase.table('processed_news').select('id').eq('news_id', str(news_id)).execute()
+        if not exists.data:
+            supabase.table('processed_news').insert({'news_id': str(news_id)}).execute()
+            return True
+        return False
+    except: return False
 
 # --- 1. דו"ח יומי ---
 def run_daily_report(rtype, cdate):
-    data = supabase.table('user_preferences').select('*').execute().data
-    users = {}
-    for e in data: users.setdefault(e['chat_id'], []).append(e['symbol'].upper())
-    for cid, symbols in users.items():
-        msg = f"☀️ *Mizrachi Markets - {rtype}*\n📅 {cdate} | 16:30\n\n"
-        for s in symbols:
-            d = fetch_stock(s)
-            if d:
-                icon = "🟢" if d['c'] >= 0 else "🔴"
-                msg += f"---\n📈 *{d['n']} ({s})*\n💰 מחיר: `${d['p']:,.2f}`\n📊 שינוי: {icon} {d['c']:+.2f}%\n🎯 יעד: `${d['p']*1.3:,.2f}`\n\n"
-            time.sleep(8)
-        msg += "---\n*Stay Sharp. Mizrachi Markets.*\n\n⚠️ *הבהרה:* המידע מופק אוטומטית על ידי אלגוריתם המנתח מקורות גלויים בלבד. אין לראות במידע זה ייעוץ השקעות."
-        send_tg(cid, msg)
+    try:
+        data = supabase.table('user_preferences').select('*').execute().data
+        users = {}
+        for e in data: users.setdefault(e['chat_id'], []).append(e['symbol'].upper())
+        for cid, symbols in users.items():
+            msg = f"☀️ *Mizrachi Markets - {rtype}*\n📅 {cdate} | 16:30\n\n"
+            for s in symbols:
+                d = fetch_stock(s)
+                if d:
+                    icon = "🟢" if d['c'] >= 0 else "🔴"
+                    msg += f"---\n📈 *{d['n']} ({s})*\n💰 מחיר: `${d['p']:,.2f}`\n📊 שינוי: {icon} {d['c']:+.2f}%\n🎯 יעד: `${d['p']*1.3:,.2f}`\n\n"
+                time.sleep(8)
+            msg += "---\n*Stay Sharp. Mizrachi Markets.*\n\n⚠️ *הבהרה:* המידע מופק אוטומטית על ידי אלגוריתם המנתח מקורות גלויים בלבד. אין לראות במידע זה ייעוץ השקעות."
+            send_tg(cid, msg)
+    except: pass
 
 # --- 2. צייד (Sniper) ---
 def run_sniper():
-    data = supabase.table('user_preferences').select('*').execute().data
-    for e in data:
-        d = fetch_stock(e['symbol'])
-        if d:
-            curr_c = d['c']
-            last_p = e.get('last_alert_percent') or 0
-            if (abs(curr_c) >= 5 and last_p == 0) or (abs(curr_c - last_p) >= 7):
-                icon = "🚀" if curr_c > 0 else "📉"
-                msg = f"{icon} *SNIPER ALERT: {d['n']} ({e['symbol']})*\n\nזוהתה תנועה חריגה של {curr_c:.2f}%!\n💰 מחיר נוכחי: `${d['p']}`\n\nStay Sharp. Mizrachi Markets."
-                send_tg(e['chat_id'], msg)
-                supabase.table('user_preferences').update({'last_alert_percent': curr_c}).eq('id', e['id']).execute()
-        time.sleep(2)
+    try:
+        data = supabase.table('user_preferences').select('*').execute().data
+        for e in data:
+            d = fetch_stock(e['symbol'])
+            if d:
+                curr_c = d['c']
+                last_p = e.get('last_alert_percent') or 0
+                if (abs(curr_c) >= 5 and last_p == 0) or (abs(curr_c - last_p) >= 7):
+                    icon = "🚀" if curr_c > 0 else "📉"
+                    msg = f"{icon} *SNIPER ALERT: {d['n']} ({e['symbol']})*\n\nזוהתה תנועה חריגה של {curr_c:.2f}%!\n💰 מחיר נוכחי: `${d['p']}`\n\nStay Sharp. Mizrachi Markets."
+                    send_tg(e['chat_id'], msg)
+                    supabase.table('user_preferences').update({'last_alert_percent': curr_c}).eq('id', e['id']).execute()
+            time.sleep(2)
+    except: pass
 
-# --- 3. רדאר (עם סינון כפילויות וניסוח אנליטי) ---
+# --- 3. רדאר ---
 def run_radar():
     try:
         leak_keywords = ['leak', 'source', 'insider', 'confidential', 'rumor', 'talks', 'unnamed', 'reported']
         finance_keywords = ['financing', 'underwriting', 'loan', 'credit', 'capital', 'investment bank', 'advisor']
-        
         url = f"https://finnhub.io/api/v1/news?category=general&token={FH_KEY}"
-        news_list = requests.get(url).json()[:5] # בודק את ה-5 האחרונות
-        
+        news_list = requests.get(url).json()[:5]
         data = supabase.table('user_preferences').select('chat_id').execute().data
         cids = set([e['chat_id'] for e in data])
-        
         for n in news_list:
             news_id = n.get('id')
-            # בדיקה: האם הכתבה הזו כבר נשלחה בעבר?
             if not is_news_new(news_id): continue 
-            
             headline = n.get('headline', '')
             summary = n.get('summary', '').lower()
             full_text = (headline + " " + summary).lower()
-            
             found_leaks = [w for w in leak_keywords if w in full_text]
             found_finance = [w for w in finance_keywords if w in full_text]
-            
             if found_leaks or found_finance:
                 insight = "🔍 *ניתוח אינדיקטורים אסטרטגיים:* "
-                if found_leaks: insight += f"זוהתה זרימת מידע ממקורות פיננסיים ודיווחים משלימים. "
-                if found_finance: insight += f"קיימת עדות למעורבות גורמי מימון מוסדיים. "
+                if found_leaks: insight += "זוהתה זרימת מידע ממקורות פיננסיים ודיווחים משלימים. "
+                if found_finance: insight += "קיימת עדות למעורבות גורמי מימון מוסדיים. "
                 insight += "הצלבת הנתונים מעלה סבירות גבוהה למהלך עסקי אסטרטגי."
-                
-                msg = f"📡 *MIZRACHI MARKETS - ANALYTICAL SIGNAL*\n\n"
-                msg += f"📢 *החדשה:* {headline}\n\n"
-                msg += f"🐬 *ניתוח דולפין (סקירת מומנטום):*\n{insight}\n\n"
-                msg += f"[🔗 לכתבה המלאה והצלבת נתונים]({n.get('url', '')})\n"
-                msg += "\n---\n*Stay Sharp. Mizrachi Markets.*"
-                
+                msg = f"📡 *MIZRACHI MARKETS - ANALYTICAL SIGNAL*\n\n📢 *החדשה:* {headline}\n\n🐬 *ניתוח דולפין:*\n{insight}\n\n[🔗 לכתבה המלאה]({n.get('url', '')})\n\n---\n*Stay Sharp. Mizrachi Markets.*"
                 for cid in cids: send_tg(cid, msg, preview=True)
     except: pass
+
+@app.route('/')
+def home(): return "Mizrachi Markets API is Active", 200
 
 @app.route('/daily_report')
 def daily_route():
@@ -123,6 +117,19 @@ def sniper_route():
 @app.route('/news_radar')
 def news_route():
     threading.Thread(target=run_radar).start()
+    return "OK", 200
+
+@app.route('/patrol')
+def patrol(): return "Warm", 200
+
+# נתיב לקבלת הודעות מטלגרם (WebHook) - כדי לתפוס את ה-ID של גיא
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.json
+    if "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        username = data["message"]["chat"].get("username", "Unknown")
+        print(f"--- NEW USER CONNECTED: ID={chat_id}, Username={username} ---")
     return "OK", 200
 
 if __name__ == "__main__":
