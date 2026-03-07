@@ -120,61 +120,11 @@ def run_sniper():
     except Exception as err:
         print(f"Sniper Error: {err}")
 
-# --- 3. רדאר (News Radar) ---
+# --- 3. רדאר (News Radar) - מנוע המודיעין המשודרג ---
 def run_radar():
     try:
-        leak_keywords = ['leak', 'source', 'insider', 'confidential', 'rumor', 'talks', 'unnamed', 'reported']
-        finance_keywords = ['financing', 'underwriting', 'loan', 'credit', 'capital', 'investment bank', 'advisor']
-        url = f"https://finnhub.io/api/v1/news?category=general&token={FH_KEY}"
-        news_list = requests.get(url).json()[:5]
-        
-        data = supabase.table('user_preferences').select('chat_id').execute().data
-        cids = set([e['chat_id'] for e in data])
-        
-        for n in news_list:
-            news_id = n.get('id')
-            if not is_news_new(news_id): continue 
-            
-            headline = n.get('headline', '')
-            summary = n.get('summary', '').lower()
-            full_text = (headline + " " + summary).lower()
-            
-            found_leaks = [w for w in leak_keywords if w in full_text]
-            found_finance = [w for w in finance_keywords if w in full_text]
-            
-            if found_leaks or found_finance:
-                insight = "🔍 *ניתוח אינדיקטורים אסטרטגיים:* "
-                if found_leaks: insight += "זוהתה זרימת מידע ממקורות פיננסיים ודיווחים משלימים. "
-                if found_finance: insight += "קיימת עדות למעורבות גורמי מימון מוסדיים. "
-                insight += "הצלבת הנתונים מעלה סבירות גבוהה למהלך עסקי אסטרטגי."
-                
-                msg = f"📡 *MIZRACHI MARKETS - ANALYTICAL SIGNAL*\n\n📢 *החדשה:* {headline}\n\n🐬 *ניתוח דולפין:*\n{insight}\n\n[🔗 לכתבה המלאה]({n.get('url', '')})\n\n---\n*Stay Sharp. Mizrachi Markets.*"
-                
-                for cid in cids: send_tg(cid, msg, preview=True)
-    except: pass
-
-@app.route('/')
-def home(): return "Mizrachi Markets API is Active", 200
-
-@app.route('/daily_report')
-def daily_route():
-    rtype = request.args.get('type', 'Daily Report')
-    cdate = datetime.datetime.now(pytz.timezone('Asia/Jerusalem')).strftime("%d/%m/%Y")
-    threading.Thread(target=run_daily_report, args=(rtype, cdate)).start()
-    return "OK", 200
-
-@app.route('/sniper_hunt')
-def sniper_route():
-    threading.Thread(target=run_sniper).start()
-    return "OK", 200
-
-@app.route('/news_radar')
-def news_route():
-    threading.Thread(target=run_radar).start()
-    return "OK", 200
-
-@app.route('/patrol')
-def patrol(): return "Warm", 200
-
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+        # מילון המשפחות המורחב של הראדאר
+        categories = {
+            'leaks': {
+                'words': ['leak', 'insider', 'rumor', 'talks', 'unnamed', 'reported', 'exploring options'],
+                'bullet': '• זוהתה זרימת מידע מוק
