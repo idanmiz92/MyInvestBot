@@ -127,4 +127,84 @@ def run_radar():
         categories = {
             'leaks': {
                 'words': ['leak', 'insider', 'rumor', 'talks', 'unnamed', 'reported', 'exploring options'],
-                'bullet': '• זוהתה זרימת מידע מוק
+                'bullet': '• זוהתה זרימת מידע מוקדמת או לא רשמית ממקורות פנימיים.'
+            },
+            'capital': {
+                'words': ['financing', 'underwriting', 'loan', 'credit', 'capital', 'investment bank', 'stake'],
+                'bullet': '• קיימת עדות למעורבות גורמי מימון מוסדיים או הזרמת הון.'
+            },
+            'ma': {
+                'words': ['merger', 'acquisition', 'buyout', 'takeover', 'spin-off', 'joint venture'],
+                'bullet': '• אותרו אינדיקטורים למהלך אסטרטגי של מיזוג, רכישה או שותפות.'
+            },
+            'restructuring': {
+                'words': ['restructuring', 'layoffs', 'bankruptcy', 'chapter 11', 'step down', 'resigns', 'job cuts', 'downsizing'],
+                'bullet': '• זוהו שינויים מבניים חריגים, קיצוצים/פיטורים או זעזועים בהנהלה.'
+            }
+        }
+
+        url = f"https://finnhub.io/api/v1/news?category=general&token={FH_KEY}"
+        news_list = requests.get(url).json()[:5]
+        
+        data = supabase.table('user_preferences').select('chat_id').execute().data
+        cids = set([e['chat_id'] for e in data])
+        
+        for n in news_list:
+            news_id = n.get('id')
+            if not is_news_new(news_id): continue 
+            
+            headline = n.get('headline', '')
+            summary = n.get('summary', '').lower()
+            full_text = (headline + " " + summary).lower()
+            
+            bullets = []
+            
+            # בדיקת כל משפחה ואיתור המילים הספציפיות
+            for cat_key, cat_data in categories.items():
+                found_words = [w for w in cat_data['words'] if w in full_text]
+                if found_words:
+                    words_str = ", ".join(found_words)
+                    bullets.append(f"{cat_data['bullet']} ({words_str})")
+            
+            # אם נמצאו בולטים, נבנה ונשלח את ההודעה
+            if bullets:
+                bullets.append("• הצלבת הנתונים מעלה סבירות לתנודתיות קרובה בנכס.")
+                insight = "\n".join(bullets)
+                
+                msg = f"🚨 *MIZRACHI MARKETS - ALL-IN NEWS RADAR* 🚨\n\n"
+                msg += f"*{headline}*\n\n"
+                msg += f"🧠 *AI Insight:*\n{insight}\n\n"
+                msg += f"🔗 [לקריאת הכתבה המלאה]({n.get('url', '')})\n\n"
+                msg += f"---\n*Stay Sharp. Mizrachi Markets.*\n"
+                msg += f"⚠️ *הבהרה:* המידע מופק אוטומטית על ידי אלגוריתם המנתח מקורות גלויים בלבד. אין לראות במידע זה ייעוץ השקעות."
+                
+                # שליחה עם preview=True כדי שהתמונה תיפתח אוטומטית למטה
+                for cid in cids: send_tg(cid, msg, preview=True)
+    except Exception as e: 
+        print(f"Radar Error: {e}")
+
+@app.route('/')
+def home(): return "Mizrachi Markets API is Active", 200
+
+@app.route('/daily_report')
+def daily_route():
+    rtype = request.args.get('type', 'Daily Report')
+    cdate = datetime.datetime.now(pytz.timezone('Asia/Jerusalem')).strftime("%d/%m/%Y")
+    threading.Thread(target=run_daily_report, args=(rtype, cdate)).start()
+    return "OK", 200
+
+@app.route('/sniper_hunt')
+def sniper_route():
+    threading.Thread(target=run_sniper).start()
+    return "OK", 200
+
+@app.route('/news_radar')
+def news_route():
+    threading.Thread(target=run_radar).start()
+    return "OK", 200
+
+@app.route('/patrol')
+def patrol(): return "Warm", 200
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
