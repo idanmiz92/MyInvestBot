@@ -11,6 +11,9 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 TD_KEY = os.environ.get("TWELVE_DATA_KEY")
 FH_KEY = os.environ.get("FINNHUB_KEY")
 
+# guy's ID
+GUY_CHAT_ID = 29140642 
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- פונקציות ליבה ---
@@ -53,44 +56,43 @@ def is_news_new(news_id):
         return False
     except: return False
 
-# --- מנועי הפעולה (ללא Threads - ריצה ישירה) ---
+# --- מנועי הפעולה (גרסת VIP - גיא בלבד בדו"חות, שניכם בראדאר) ---
 
-def run_daily_report(rtype, cdate, admin_chat_id=None):
+def run_daily_report(rtype, cdate):
     current_time = datetime.datetime.now(pytz.timezone('Asia/Jerusalem')).strftime('%H:%M')
-    data = supabase.table('user_preferences').select('*').execute().data
-    users = {}
-    for e in data: users.setdefault(e['chat_id'], []).append(e['symbol'].upper())
+    # שליפת המניות שמשויכות ספציפית ל-ID של גיא ב-DB
+    data = supabase.table('user_preferences').select('*').eq('chat_id', GUY_CHAT_ID).execute().data
     
-    for cid, symbols in users.items():
-        if admin_chat_id and str(cid) != str(admin_chat_id): continue
-        msg = f"☀️ *Mizrachi Markets - {rtype}*\n📅 {cdate} | {current_time}\n\n"
-        for s in symbols:
-            d = fetch_stock(s)
-            if d:
-                icon = "🟢" if d['c'] >= 0 else "🔴"
-                msg += f"---\n📈 *{d['n']} ({s})*\n💰 מחיר: `${d['p']:,.2f}`\n📊 שינוי: {icon} {d['c']:+.2f}%\n🎯 יעד: `${d['p']*1.3:,.2f}`\n\n"
-            time.sleep(1) # צמצום המתנה למינימום למניעת Timeout
-        msg += "---\n*Stay Sharp. Mizrachi Markets.*\n\n⚠️ *הבהרה:* המידע מופק אוטומטית על ידי אלגוריתם המנתח מקורות גלויים בלבד."
-        send_tg(cid, msg)
+    if not data: return
+    
+    msg = f"☀️ *Mizrachi Markets - {rtype}*\n📅 {cdate} | {current_time}\n\n"
+    for e in data:
+        s = e['symbol'].upper()
+        d = fetch_stock(s)
+        if d:
+            icon = "🟢" if d['c'] >= 0 else "🔴"
+            msg += f"---\n📈 *{d['n']} ({s})*\n💰 מחיר: `${d['p']:,.2f}`\n📊 שינוי: {icon} {d['c']:+.2f}%\n🎯 יעד: `${d['p']*1.3:,.2f}`\n\n"
+        time.sleep(1)
+    
+    msg += "---\n*Stay Sharp. Mizrachi Markets.*\n\n⚠️ *הבהרה:* המידע מופק אוטומטית על ידי אלגוריתם המנתח מקורות גלויים בלבד."
+    send_tg(GUY_CHAT_ID, msg)
 
 def run_sniper():
-    data = supabase.table('user_preferences').select('*').execute().data
-    symbols_to_users = {}
+    # סריקת מניות להתראות חריגות - רק עבור גיא
+    data = supabase.table('user_preferences').select('*').eq('chat_id', GUY_CHAT_ID).execute().data
+    
     for e in data:
         sym = e['symbol'].upper()
-        symbols_to_users.setdefault(sym, []).append(e)
-
-    for sym, users_data in symbols_to_users.items():
         d = fetch_stock(sym)
         if not d: continue
         curr_c = d['c']
-        for user_row in users_data:
-            last_p = user_row.get('last_alert_percent') or 0
-            if (abs(curr_c) >= 5 and last_p == 0) or (abs(curr_c - last_p) >= 7):
-                change_icon = "🟢" if curr_c > 0 else "🔴"
-                msg = f"🚀 *Mizrachi Markets - SNIPER ALERT*\n📅 {datetime.datetime.now(pytz.timezone('Asia/Jerusalem')).strftime('%d/%m/%Y')}\n---\n📊 *{d['n']} ({sym})*\n💰 מחיר: `${d['p']:,.2f}`\n⚡ שינוי: {change_icon} `{curr_c:+.2f}%`"
-                send_tg(user_row['chat_id'], msg)
-                supabase.table('user_preferences').update({'last_alert_percent': curr_c}).eq('id', user_row['id']).execute()
+        last_p = e.get('last_alert_percent') or 0
+        
+        if (abs(curr_c) >= 5 and last_p == 0) or (abs(curr_c - last_p) >= 7):
+            change_icon = "🟢" if curr_c > 0 else "🔴"
+            msg = f"🚀 *Mizrachi Markets - SNIPER ALERT*\n📅 {datetime.datetime.now(pytz.timezone('Asia/Jerusalem')).strftime('%d/%m/%Y')}\n---\n📊 *{d['n']} ({sym})*\n💰 מחיר: `${d['p']:,.2f}`\n⚡ שינוי: {change_icon} `{curr_c:+.2f}%`"
+            send_tg(GUY_CHAT_ID, msg)
+            supabase.table('user_preferences').update({'last_alert_percent': curr_c}).eq('id', e['id']).execute()
 
 def run_radar():
     categories = {
@@ -101,6 +103,8 @@ def run_radar():
     }
     url = f"https://finnhub.io/api/v1/news?category=general&token={FH_KEY}"
     news_list = requests.get(url, timeout=10).json()[:5]
+    
+    # הראדאר ממשיך לשלוח לכל מי שרשום ב-DB (כולל אותך)
     data = supabase.table('user_preferences').select('chat_id').execute().data
     cids = set([e['chat_id'] for e in data])
     
@@ -122,23 +126,23 @@ def run_radar():
 # --- Routes ---
 
 @app.route('/')
-def home(): return "Mizrachi Markets API is Active", 200
+def home(): return "Mizrachi Markets VIP API is Active", 200
 
 @app.route('/daily_report')
 def daily_route():
     rtype = request.args.get('type', 'Daily Report')
     cdate = datetime.datetime.now(pytz.timezone('Asia/Jerusalem')).strftime("%d/%m/%Y")
-    run_daily_report(rtype, cdate) # ריצה ישירה
+    run_daily_report(rtype, cdate)
     return "OK", 200
 
 @app.route('/sniper_hunt')
 def sniper_route():
-    run_sniper() # ריצה ישירה
+    run_sniper()
     return "OK", 200
 
 @app.route('/news_radar')
 def news_route():
-    run_radar() # ריצה ישירה
+    run_radar()
     return "OK", 200
 
 @app.route('/patrol')
